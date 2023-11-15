@@ -8,11 +8,11 @@
 
 <div align="center">
 
-|  Name                          | Role                       | Institution                     |
-|:-:                             |:-:                         |:-:                              |
-|  Saeed Shurrab                 | Rsearch assistant          |   New York University Abu Dhabi |
-|  S. Farokh Atashzar            | PostDoc researcher         |   New York University Abu Dhabi |
-|  Farah Shamout                 | principal investigator     |   New York University Abu Dhabi |
+|  Name                                   | Role                       | Institution                     |
+|:-:                                      |:-:                         |:-:                              |
+|  Saeed Shurrab                          | Rsearch assistant          |   New York University Abu Dhabi |
+|  alejandro guerra-manzanares            | PostDoc researcher         |   New York University Abu Dhabi |
+|  Farah Shamout                          | Principal investigator     |   New York University Abu Dhabi |
 
 
 </div>
