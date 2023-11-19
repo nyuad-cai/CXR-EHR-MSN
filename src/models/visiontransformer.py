@@ -4,59 +4,11 @@ import torch
 import warnings
 import torch.nn as nn
 
-from torchvision.ops.misc import log_api_usage_once
+
 from functools import partial
 from collections import OrderedDict
 from src.models.utils import get_at_index, ConvStemConfig, make_ntuple,log_api_usage_once
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union,Sequence
-
-
-
-class MLP(torch.nn.Sequential):
-    """This block implements the multi-layer perceptron (MLP) module.
-
-    Args:
-        in_channels (int): Number of channels of the input
-        hidden_channels (List[int]): List of the hidden channel dimensions
-        norm_layer (Callable[..., torch.nn.Module], optional): Norm layer that will be stacked on top of the linear layer.
-        If ``None`` this layer won't be used. Default: ``None`` activation_layer (Callable[..., torch.nn.Module], optional): 
-        Activation function which will be stacked on top of the normalization layer (if not None), otherwise on top of the 
-        linear layer. If ``None`` this layer won't be used. Default: ``torch.nn.ReLU``
-        inplace (bool, optional): Parameter for the activation layer, which can optionally do the operation in-place.
-            Default is ``None``, which uses the respective default values of the ``activation_layer`` and Dropout layer.
-        bias (bool): Whether to use bias in the linear layer. Default ``True``
-        dropout (float): The probability for the dropout layer. Default: 0.0
-    """
-
-    def __init__(
-        self,
-        in_channels: int,
-        hidden_channels: List[int],
-        norm_layer: Optional[Callable[..., torch.nn.Module]] = None,
-        activation_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.ReLU,
-        inplace: Optional[bool] = None,
-        bias: bool = True,
-        dropout: float = 0.0,
-    ):
-        # The addition of `norm_layer` is inspired from the implementation of TorchMultimodal:
-        # https://github.com/facebookresearch/multimodal/blob/5dec8a/torchmultimodal/modules/layers/mlp.py
-        params = {} if inplace is None else {"inplace": inplace}
-
-        layers = []
-        in_dim = in_channels
-        for hidden_dim in hidden_channels[:-1]:
-            layers.append(torch.nn.Linear(in_dim, hidden_dim, bias=bias))
-            if norm_layer is not None:
-                layers.append(norm_layer(hidden_dim))
-            layers.append(activation_layer(**params))
-            layers.append(torch.nn.Dropout(dropout, **params))
-            in_dim = hidden_dim
-
-        layers.append(torch.nn.Linear(in_dim, hidden_channels[-1], bias=bias))
-        layers.append(torch.nn.Dropout(dropout, **params))
-
-        super().__init__(*layers)
-        log_api_usage_once(self)
+from typing import Callable, List, Optional, Tuple, Union,Sequence
 
 
 
@@ -116,7 +68,6 @@ class ConvNormActivation(torch.nn.Sequential):
                 "Don't use ConvNormActivation directly, please use Conv2dNormActivation and Conv3dNormActivation instead."
             )
 
-
 class Conv2dNormActivation(ConvNormActivation):
     """
     Configurable block used for Convolution2d-Normalization-Activation blocks.
@@ -167,6 +118,52 @@ class Conv2dNormActivation(ConvNormActivation):
         )
 
 
+class MLP(torch.nn.Sequential):
+    """This block implements the multi-layer perceptron (MLP) module.
+
+    Args:
+        in_channels (int): Number of channels of the input
+        hidden_channels (List[int]): List of the hidden channel dimensions
+        norm_layer (Callable[..., torch.nn.Module], optional): Norm layer that will be stacked on top of the linear layer. If ``None`` this layer won't be used. Default: ``None``
+        activation_layer (Callable[..., torch.nn.Module], optional): Activation function which will be stacked on top of the normalization layer (if not None), otherwise on top of the linear layer. If ``None`` this layer won't be used. Default: ``torch.nn.ReLU``
+        inplace (bool, optional): Parameter for the activation layer, which can optionally do the operation in-place.
+            Default is ``None``, which uses the respective default values of the ``activation_layer`` and Dropout layer.
+        bias (bool): Whether to use bias in the linear layer. Default ``True``
+        dropout (float): The probability for the dropout layer. Default: 0.0
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        hidden_channels: List[int],
+        norm_layer: Optional[Callable[..., torch.nn.Module]] = None,
+        activation_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.ReLU,
+        inplace: Optional[bool] = None,
+        bias: bool = True,
+        dropout: float = 0.0,
+    ):
+        # The addition of `norm_layer` is inspired from the implementation of TorchMultimodal:
+        # https://github.com/facebookresearch/multimodal/blob/5dec8a/torchmultimodal/modules/layers/mlp.py
+        params = {} if inplace is None else {"inplace": inplace}
+
+        layers = []
+        in_dim = in_channels
+        for hidden_dim in hidden_channels[:-1]:
+            layers.append(torch.nn.Linear(in_dim, hidden_dim, bias=bias))
+            if norm_layer is not None:
+                layers.append(norm_layer(hidden_dim))
+            layers.append(activation_layer(**params))
+            layers.append(torch.nn.Dropout(dropout, **params))
+            in_dim = hidden_dim
+
+        layers.append(torch.nn.Linear(in_dim, hidden_channels[-1], bias=bias))
+        layers.append(torch.nn.Dropout(dropout, **params))
+
+        super().__init__(*layers)
+        log_api_usage_once(self)
+
+
+
 class MLPBlock(MLP):
     """Transformer MLP block."""
 
@@ -213,17 +210,19 @@ class MLPBlock(MLP):
         )
 
 
+
 class EncoderBlock(nn.Module):
     """Transformer encoder block."""
 
-    def __init__(self,
-                 num_heads: int,
-                 hidden_dim: int,
-                 mlp_dim: int,
-                 dropout: float,
-                 attention_dropout: float,
-                 norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
-                ):
+    def __init__(
+        self,
+        num_heads: int,
+        hidden_dim: int,
+        mlp_dim: int,
+        dropout: float,
+        attention_dropout: float,
+        norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+    ):
         super().__init__()
         self.num_heads = num_heads
 
@@ -246,7 +245,7 @@ class EncoderBlock(nn.Module):
         y = self.ln_2(x)
         y = self.mlp(y)
         return x + y
-
+    
 
 
 class Encoder(nn.Module):
@@ -331,20 +330,21 @@ class Encoder(nn.Module):
         )
         pos_embedding = pos_embedding.permute(0, 2, 3, 1).view(1, -1, dim)
         return torch.cat((class_emb.unsqueeze(0), pos_embedding), dim=1)
+    
 
 
 
 class VisionTransformer(nn.Module):
     """Vision Transformer as per https://arxiv.org/abs/2010.11929."""
-
+    # defualt settings vits16
     def __init__(
         self,
         image_size: int = 224,
         patch_size: int = 16,
-        num_layers: int = 6,
-        num_heads: int = 4,
-        hidden_dim: int = 512,
-        mlp_dim: int = 512,
+        num_layers: int = 12,
+        num_heads: int = 3,
+        hidden_dim: int = 192,
+        mlp_dim: int = 768,
         dropout: float = 0.0,
         attention_dropout: float = 0.0,
         num_classes: int = 1000,
@@ -446,8 +446,8 @@ class VisionTransformer(nn.Module):
     def _process_input(self, x: torch.Tensor) -> torch.Tensor:
         n, c, h, w = x.shape
         p = self.patch_size
-        torch._assert(h == self.image_size, f"Wrong image height! Expected {self.image_size} but got {h}!")
-        torch._assert(w == self.image_size, f"Wrong image width! Expected {self.image_size} but got {w}!")
+        #torch._assert(h == self.image_size, f"Wrong image height! Expected {self.image_size} but got {h}!")
+        #torch._assert(w == self.image_size, f"Wrong image width! Expected {self.image_size} but got {w}!")
         n_h = h // p
         n_w = w // p
 
@@ -490,6 +490,4 @@ class VisionTransformer(nn.Module):
         #x = self.heads(x)
 
         # return x
-
-
-# stemconfig = [ConvStemConfig(out_channels = 64, kernel_size = 3 , stride = 2) for i in range(4)]
+                                                                                                                                                                                                                 

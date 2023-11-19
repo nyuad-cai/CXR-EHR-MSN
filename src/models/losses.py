@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+
 def prototype_probabilities(queries: torch.tensor,
                             prototypes: torch.tensor,
                             temperature: float,
@@ -24,6 +26,7 @@ def prototype_probabilities(queries: torch.tensor,
 
     """                           
     return F.softmax(torch.matmul(queries, prototypes.T) / temperature, dim=1)
+
 
 
 def sharpen(probabilities: torch.tensor, 
@@ -95,12 +98,14 @@ def sinkhorn(probabilities: torch.tensor,
     return probabilities.T
 
 
+
 def regularization_loss(mean_anchor_probs: torch.tensor
                        ) -> torch.tensor:
     """Calculates mean entropy regularization loss."""
     loss = -torch.sum(torch.log(mean_anchor_probs ** (-mean_anchor_probs)))
     loss += math.log(float(len(mean_anchor_probs)))
     return loss
+
 
 
 class MSNLoss(nn.Module):
@@ -128,17 +133,18 @@ class MSNLoss(nn.Module):
                 targets: torch.tensor,
                 prototypes: torch.tensor,
                 target_sharpen_temperature: float = 0.25,
+                focal: bool = True
                       ) -> torch.tensor:
         
-        similarity_loss = self.similarity_weight * self._forward_loss(anchors=anchors[:,0],
+        similarity_loss = self.similarity_weight * self._forward_loss(anchors=anchors[0] if focal else anchors[:,0],
                                                                       targets=targets[:,0],
                                                                       prototypes=prototypes[0].weight
                                                                      )
-        gender_loss = self.age_weight * self._forward_loss(anchors=anchors[:,1],
+        age_loss = self.age_weight * self._forward_loss(anchors=anchors[1] if focal else anchors[:,1],
                                                            targets=targets[:,1],
                                                            prototypes=prototypes[1].weight
                                                           )
-        gender_loss = self.gender_weight * self._forward_loss(anchors=anchors[:,2],
+        gender_loss = self.gender_weight * self._forward_loss(anchors=anchors[2] if focal else anchors[:,2],
                                                               targets=targets[:,2],
                                                               prototypes=prototypes[2].weight
                                                              )
@@ -173,7 +179,7 @@ class MSNLoss(nn.Module):
                 target_probs = sinkhorn(probabilities=target_probs,
                                         iterations=self.sinkhorn_iterations,
                                         )
-                #target_probs = target_probs.repeat((num_views, 1))
+            target_probs = torch.repeat_interleave(target_probs, repeats=num_views, dim=0)
 
         loss = torch.mean(torch.sum(torch.log(anchor_probs ** (-target_probs)), dim=1))
 
@@ -184,3 +190,6 @@ class MSNLoss(nn.Module):
             loss += self.regularization_weight * reg_loss
             
         return loss
+    
+
+    

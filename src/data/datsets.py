@@ -1,32 +1,25 @@
-
-
-import os
 import torch
-import torch.nn as nn 
-import pytorch_lightning as pl
+import random
+import pandas as pd
+import torch.nn as nn
 
-from typing import Tuple, Optional
-from torch import Tensor
 from PIL import Image
+from typing import Tuple
 from torch.utils.data import Dataset
 
 
-class ChexMSNDataset(nn.Module):
-    pass
 
-
-class PretrainDataset(Dataset):
+class ChexMSNDataset(Dataset):
     def __init__(self, 
-                 data_dir: str, 
-                 mode:str
+                 data_dir: str,
+                 transforms: nn.Module,
+                 same = True
                  ) -> None:
       
-        self.data_dir = data_dir
-        self.mode = mode
-        self.all_images = os.listdir(self.data_dir)
-        for image in self.all_images:
-            if image.startswith('._'):
-                self.all_images.remove(image)
+        self.meta = pd.read_csv(data_dir)
+        self.all_images = list(self.meta.path)
+        self.transform = transforms
+        self.same = same
         
     def __len__(self
                 ) -> int:
@@ -34,17 +27,52 @@ class PretrainDataset(Dataset):
     
     def __getitem__(self,
                     index: int
-                    ) -> Tuple[Tensor]:
+                    ) -> Tuple[torch.Tensor]:
 
         
-        name = self.all_images[index]
-        path = os.path.join(self.data_dir, name)
-        img = Image.open(fp=path).convert('RGB')
-        if self.mode == 'dino':
-            pass
-        #     img = transform1(img)
-        # elif self.mode == 'simsiam':
-        #     img = transform2(img)
+        target_path = self.all_images[index]
+        image_id = target_path.split('/')[-1][:-4]
+        img_age_path, img_gender_path = self._retrieve_anchors(image_id=image_id,
+                                                               meta = self.meta,
+                                                               same=self.same)
 
+        img_target = Image.open(fp=target_path).convert('RGB')
+        img_target = self.transform(img_target)
+        
+        img_age = Image.open(fp=img_age_path).convert('RGB')
+        img_age = self.transform(img_age)
 
-        return img, index, name
+        img_gender = Image.open(fp=img_gender_path).convert('RGB')
+        img_gender = self.transform(img_gender)
+
+        return (img_target,img_age,img_gender)
+    
+    
+    def _retrieve_anchors(self,
+                          image_id: str,
+                          meta: pd.DataFrame,
+                          same: bool = False) -> Tuple[str]:
+        record = meta[meta.dicom_id == image_id]
+    
+        subject_id = list(record.subject_id)[0]
+        age_groub =list(record.ageR5)[0] 
+        gender = list(record.gender)[0]
+    
+        group = meta[meta.ageR5 == age_groub]
+    
+        if same:
+            candidate_anchors = group[group.gender == gender]
+            candidate_anchors = candidate_anchors[candidate_anchors.subject_id != subject_id]
+            images= list(candidate_anchors.path)
+            sampled_images = random.sample(images,k=2)
+            image_age, image_gender = sampled_images[0],sampled_images[1]
+            return image_age, image_gender
+        else:
+            candidate_anchors = group
+            candidate_anchors = candidate_anchors[candidate_anchors.subject_id != subject_id]
+            images= list(candidate_anchors.path)
+            image_age = random.sample(images,k=1)[0]
+            candidate_anchors = candidate_anchors[candidate_anchors.gender == gender]
+            images= list(candidate_anchors.path)
+            image_gender = random.sample(images,k=1)[0]
+            return image_age, image_gender
