@@ -25,11 +25,10 @@ class DenseBlock(nn.Module):
                                         )
     def forward(self,
                 x: torch.Tensor
-                ) -> torch.tensor:
+                ) -> torch.Tensor:
         x = self.dense_block(x)
         return x
-
-
+    
 
 class ProjectionHead(nn.Module):
     def __init__(self,
@@ -63,8 +62,6 @@ class ProjectionHead(nn.Module):
         x = self.projection_head(x)
         return x
     
-
-
 class ChexMSN(nn.Module):
     def __init__(self,
                backbone: nn.Module,
@@ -91,7 +88,7 @@ class ChexMSN(nn.Module):
 
 
     def forward(self,
-                views:list[torch.tensor],
+                views:list[torch.Tensor],
                 focal: bool = True
                 ) -> tuple[torch.Tensor]:
 
@@ -109,30 +106,29 @@ class ChexMSN(nn.Module):
         return projections
 
     def _target_forward(self,
-                        view: torch.tensor
+                        view: torch.Tensor
                         ) -> torch.Tensor:
 
         target_encodings = self.target_backbone(x= view,
-                                                branch='target'
-                                                )
+                                                branch='target')
         target_projections = self.target_projection_head(x= target_encodings)
 
         return target_projections
 
 
     def _anchor_forward(self,
-                        view: torch.tensor
+                        view: torch.Tensor
                         ) -> torch.Tensor:
 
         batch_size, _, _, width = view.shape
         seq_length = (width // self.backbone.patch_size) ** 2
         idx_keep, idx_mask = random_token_mask(size= (view.shape[0],seq_length),
-                                               mask_ratio= self.masking_ratio
-                                          )
+                                               mask_ratio= self.masking_ratio,
+                                               device=torch.device("cuda"))
 
         anchor_encodings = self.backbone(x= view,
-                                                branch= 'anchor',
-                                                idx_keep= idx_keep)
+                                         branch= 'anchor',
+                                         idx_keep= idx_keep)
         anchor_projections = self.projection_head(x= anchor_encodings)
 
         return anchor_projections
@@ -141,15 +137,15 @@ class ChexMSN(nn.Module):
     def _forward_all(self,
                      batch: list,
                      focal: bool = True
-                     ) -> torch.tensor:
+                     ) -> torch.Tensor:
         
-        target_view = batch[0][0]
-        anchor_view_sim = batch[0][1]
-        focal_views_sim = torch.concat(batch[0][2:],dim=0)
-        anchor_view_age = batch[1][1]
-        focal_views_age = torch.concat(batch[1][2:],dim=0)
-        anchor_view_gender = batch[2][1]
-        focal_views_gender = torch.concat(batch[2][2:],dim=0)
+        target_view = batch[0][0].to('cuda')
+        anchor_view_sim = batch[0][1].to('cuda')
+        focal_views_sim = torch.concat(batch[0][2:],dim=0).to('cuda')
+        anchor_view_age = batch[1][1].to('cuda')
+        focal_views_age = torch.concat(batch[1][2:],dim=0).to('cuda')
+        anchor_view_gender = batch[2][1].to('cuda')
+        focal_views_gender = torch.concat(batch[2][2:],dim=0).to('cuda')
         
         
         target_projections = self._target_forward(target_view)
@@ -195,10 +191,10 @@ class ChexMSN(nn.Module):
                 target_projections)
     
     def _arrange_tokens(self,
-                        tensor1: torch.tensor,
-                        tensor2:torch.tensor,
+                        tensor1: torch.Tensor,
+                        tensor2:torch.Tensor,
                         num_focal: int = 10
-                        ) ->torch.tensor:
+                        ) ->torch.Tensor:
 
         a = torch.stack(torch.split(tensor1,1),0)
         b = torch.stack(torch.split(tensor2,num_focal),0)
@@ -216,7 +212,7 @@ class ChexMSNModel(pl.LightningModule):
                  learning_rate: float =  1e-3,
                  weight_decay: float = 0.0,
                  max_epochs: int = 50,
-
+                 focal: bool = True
 
                 ) -> None:
         super().__init__()
@@ -227,14 +223,13 @@ class ChexMSNModel(pl.LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.max_epochs = max_epochs
-        
+        self.focal = focal
         self.in_prototypes = self.model.projection_head.out_features
-        self.prototypes = nn.ModuleList([nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes),
-                                         nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes),
-                                         nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes)])
+        self.prototypes = nn.ModuleList([nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False),
+                                         nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False),
+                                         nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False)])
     
     
-
     def training_step(self, 
                       batch: List[torch.Tensor], 
                       batch_idx: int
@@ -242,8 +237,8 @@ class ChexMSNModel(pl.LightningModule):
         
 
         anchors, target = self.model(batch) 
-        loss = self.criterion(anchors,target,self.prototypes)
-        self.log("train_loss", loss, on_epoch= True,on_step=True , logger=True)      
+        loss = self.criterion(anchors,target,self.prototypes,focal=self.focal)
+        self.log("train_loss", loss, on_epoch= True,on_step=True, logger=True,)
         return loss
 
 
@@ -252,7 +247,9 @@ class ChexMSNModel(pl.LightningModule):
         params = [
             *list(self.model.backbone.parameters()),
             *list(self.model.projection_head.parameters()),
-            self.prototypes,
+            self.prototypes[0].weight,
+            self.prototypes[1].weight,
+            self.prototypes[2].weight,
         ]
         
         optimizer = torch.optim.AdamW(params, 
@@ -265,3 +262,5 @@ class ChexMSNModel(pl.LightningModule):
         return {'optimizer': optimizer,
                'lr_scheduler': scheduler
                }
+    
+

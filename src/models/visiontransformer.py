@@ -68,6 +68,7 @@ class ConvNormActivation(torch.nn.Sequential):
                 "Don't use ConvNormActivation directly, please use Conv2dNormActivation and Conv3dNormActivation instead."
             )
 
+
 class Conv2dNormActivation(ConvNormActivation):
     """
     Configurable block used for Convolution2d-Normalization-Activation blocks.
@@ -163,7 +164,6 @@ class MLP(torch.nn.Sequential):
         log_api_usage_once(self)
 
 
-
 class MLPBlock(MLP):
     """Transformer MLP block."""
 
@@ -210,7 +210,6 @@ class MLPBlock(MLP):
         )
 
 
-
 class EncoderBlock(nn.Module):
     """Transformer encoder block."""
 
@@ -246,7 +245,6 @@ class EncoderBlock(nn.Module):
         y = self.mlp(y)
         return x + y
     
-
 
 class Encoder(nn.Module):
     """Transformer Model Encoder for sequence to sequence translation."""
@@ -329,9 +327,8 @@ class Encoder(nn.Module):
             mode="bicubic",
         )
         pos_embedding = pos_embedding.permute(0, 2, 3, 1).view(1, -1, dim)
-        return torch.cat((class_emb.unsqueeze(0), pos_embedding), dim=1)
+        return torch.cat((class_emb.unsqueeze(0), pos_embedding), dim=1)    
     
-
 
 
 class VisionTransformer(nn.Module):
@@ -490,4 +487,3 @@ class VisionTransformer(nn.Module):
         #x = self.heads(x)
 
         # return x
-                                                                                                                                                                                                                 

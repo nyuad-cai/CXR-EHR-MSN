@@ -2,11 +2,18 @@ from typing import Dict, List, Tuple, Union
 
 import torchvision.transforms as T
 from PIL.Image import Image
-from torch import Tensor
-
+import torch
+import tqdm
 
 from lightly.transforms.multi_view_transform import MultiViewTransform
-from lightly.transforms.utils import IMAGENET_NORMALIZE
+
+from lightly.transforms.multi_view_transform import MultiViewTransform
+IMAGENET_STAT = {"mean":torch.tensor([0.4884, 0.4550, 0.4171]),
+                 "std":torch.tensor([0.2596, 0.2530, 0.2556])}
+
+MIMIC_NORMALIZE ={"mean":torch.tensor([0.4723, 0.4723, 0.4723]), 
+                  "std":torch.tensor([0.3023, 0.3023, 0.3023])}
+
 
 class MSNTransform(MultiViewTransform):
     """Implements the transformations for MSN [0].
@@ -62,8 +69,8 @@ class MSNTransform(MultiViewTransform):
         random_crop_scale: Tuple[float, float] = (0.3, 1.0),
         focal_crop_scale: Tuple[float, float] = (0.05, 0.3),
         hf_prob: float = 0.5,
-        vf_prob: float = 0.2,
-        normalize: Dict[str, List[float]] = IMAGENET_NORMALIZE,
+        vf_prob: float = 0.0,
+        normalize: Dict[str, List[float]] = MIMIC_NORMALIZE,
     ):
         random_view_transform = MSNViewTransform(
             affine_dgrees=affine_dgrees,
@@ -92,8 +99,6 @@ class MSNTransform(MultiViewTransform):
         super().__init__(transforms=transforms)
 
 
-
-
 class MSNViewTransform:
     def __init__(
         self,
@@ -104,8 +109,8 @@ class MSNViewTransform:
         crop_size: int = 224,
         crop_scale: Tuple[float, float] = (0.3, 1.0),
         hf_prob: float = 0.5,
-        vf_prob: float = 0.2,
-        normalize: Dict[str, List[float]] = IMAGENET_NORMALIZE,
+        vf_prob: float = 0.0,
+        normalize: Dict[str, List[float]] = MIMIC_NORMALIZE,
     ):
 
         transform = [
@@ -122,7 +127,7 @@ class MSNViewTransform:
 
         self.transform = T.Compose(transform)
 
-    def __call__(self, image: Union[Tensor, Image]) -> Tensor:
+    def __call__(self, image: Union[torch.Tensor, Image]) -> torch.Tensor:
         """
         Applies the transforms to the input image.
 
@@ -134,5 +139,22 @@ class MSNViewTransform:
             The transformed image.
 
         """
-        transformed: Tensor = self.transform(image)
+        transformed = self.transform(image)
         return transformed
+    
+
+
+def get_mean_and_std(dataloader):
+    channels_sum, channels_squared_sum, num_batches = 0, 0, 0
+    for data in tqdm(dataloader):
+        # Mean over batch, height and width, but not over the channels
+        channels_sum += torch.mean(data, dim=[0,2,3])
+        channels_squared_sum += torch.mean(data**2, dim=[0,2,3])
+        num_batches += 1
+    
+    mean = channels_sum / num_batches
+
+    # std = sqrt(E[X^2] - (E[X])^2)
+    std = (channels_squared_sum / num_batches - mean ** 2) ** 0.5
+
+    return mean, std

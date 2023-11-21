@@ -1,11 +1,11 @@
 import torch
 import collections
 import torch.nn as nn
-
+import warnings
 
 from itertools import repeat
 from types import FunctionType
-from typing import Callable, NamedTuple, Any, Tuple
+from typing import Callable, NamedTuple, Any, Tuple, Optional, Union, Sequence
 
 
 # general utilities
@@ -51,7 +51,6 @@ def log_api_usage_once(obj: Any) -> None:
     torch._C._log_api_usage_once(f"{module}.{name}")
 
 
-
 def make_ntuple(x: Any, n: int) -> Tuple[Any, ...]:
     """
     Make n-tuple from input x. If x is an iterable, then we just convert it to tuple.
@@ -65,7 +64,6 @@ def make_ntuple(x: Any, n: int) -> Tuple[Any, ...]:
     if isinstance(x, collections.abc.Iterable):
         return tuple(x)
     return tuple(repeat(x, n))
-
 
 
 def expand_index_like(index: torch.Tensor, tokens: torch.Tensor) -> torch.Tensor:
@@ -88,7 +86,6 @@ def expand_index_like(index: torch.Tensor, tokens: torch.Tensor) -> torch.Tensor
     return index
 
 
-
 def get_at_index(tokens: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
     """Selects tokens at index.
 
@@ -108,9 +105,6 @@ def get_at_index(tokens: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
     return torch.gather(tokens, 1, index)
 
 
-
-# chexmsn utilities
-
 def deactivate_requires_grad(model: nn.Module):
     """Deactivates the requires_grad flag for all parameters of a model.
 
@@ -124,7 +118,6 @@ def deactivate_requires_grad(model: nn.Module):
     """
     for param in model.parameters():
         param.requires_grad = False
-
 
 @torch.no_grad()
 def update_momentum(model: nn.Module, model_ema: nn.Module, m: float):
@@ -146,11 +139,12 @@ def update_momentum(model: nn.Module, model_ema: nn.Module, m: float):
         model_ema.data = model_ema.data * m + model.data * (1.0 - m)
 
 
-
-def random_token_mask(size: Tuple[int, int],
-                      mask_ratio: float = 0.6,
-                      mask_class_token: bool = False,
-                     ) -> torch.Tensor:
+def random_token_mask(
+    size: Tuple[int, int],
+    mask_ratio: float = 0.15,
+    mask_class_token: bool = False,
+    device: Optional[Union[torch.device, str]] = None,
+) -> torch.Tensor:
     """Creates random token masks.
 
     Args:
@@ -176,7 +170,7 @@ def random_token_mask(size: Tuple[int, int],
     batch_size, sequence_length = size
     num_keep = int(sequence_length * (1 - mask_ratio))
 
-    noise = torch.rand(batch_size, sequence_length)
+    noise = torch.rand(batch_size, sequence_length, device=device)
     if not mask_class_token and sequence_length > 0:
         # make sure that class token is not masked
         noise[:, 0] = -1
@@ -188,3 +182,5 @@ def random_token_mask(size: Tuple[int, int],
     idx_mask = indices[:, num_keep:]
 
     return idx_keep, idx_mask
+
+
