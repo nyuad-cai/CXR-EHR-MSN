@@ -2,11 +2,11 @@ import torch
 import random
 import pandas as pd
 import torch.nn as nn
-
+import torchvision.transforms as T
 from PIL import Image
-from typing import Tuple
+from typing import Tuple, Optional
 from torch.utils.data import Dataset
-
+from src.data.utils import preprocess
 
 
 class ChexMSNDataset(Dataset):
@@ -78,3 +78,45 @@ class ChexMSNDataset(Dataset):
             return image_age, image_gender
         
 
+class MIMICCXR(Dataset):
+    def __init__(self, 
+                 paths: str,
+                 data_dir: str, 
+                 transform: Optional[T.Compose] = None, 
+                 split: str = 'validate',
+                 percentage:float = 1.0
+                 ) -> None:
+        self.data_dir = data_dir
+        self.transform = transform
+        self.filenames_to_path, \
+        self.filenames_loaded, \
+        self.filesnames_to_labels = preprocess(data_dir=self.data_dir,
+                                               paths=paths,
+                                               split=split
+                                              )
+        limit = (round(len(self.filenames_loaded) * percentage))
+        self.filenames_loaded = self.filenames_loaded[0:limit]
+ 
+        
+    def __getitem__(self, index):
+        if isinstance(index, str):
+            img = Image.open(self.filenames_to_path[index]).convert('RGB')
+            labels = torch.tensor(self.filesnames_to_labels[index]).float()
+
+            if self.transform is not None:
+                img = self.transform(img)
+            return img, labels
+        
+        filename = self.filenames_loaded[index]
+        
+        img = Image.open(self.filenames_to_path[filename]).convert('RGB')
+
+        labels = torch.tensor(self.filesnames_to_labels[filename]).float()
+        
+            
+        if self.transform is not None:
+            img = self.transform(img)
+        return img, labels
+
+    def __len__(self):
+        return len(self.filenames_loaded)

@@ -5,7 +5,7 @@ import warnings
 
 from itertools import repeat
 from types import FunctionType
-from typing import Callable, NamedTuple, Any, Tuple, Optional, Union, Sequence
+from typing import Callable, NamedTuple, Any, Tuple, Optional, Union, Sequence, Dict
 
 
 # general utilities
@@ -184,3 +184,17 @@ def random_token_mask(
     return idx_keep, idx_mask
 
 
+def parse_weights(weights: Dict[str,torch.Tensor]) -> Dict[str,torch.Tensor]:
+    
+    for k in list(weights.keys()):
+
+        if k.startswith('model.target_backbone.'):
+            
+            if k.startswith('model.target_backbone') and not k.startswith('model.target_backbone.heads'):
+                
+                weights[k[len("model.target_backbone."):]] = weights[k]
+                
+        del weights[k]
+    del weights['class_token'] 
+    del weights['encoder.pos_embedding']    
+    return weights

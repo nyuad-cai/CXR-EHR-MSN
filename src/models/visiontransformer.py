@@ -392,7 +392,7 @@ class VisionTransformer(nn.Module):
 
         self.seq_length = (image_size // patch_size) ** 2
         # Add a class token
-        self.class_token = nn.Parameter(torch.zeros(1, self.num_cls_tokens, hidden_dim))
+        self.class_token = nn.Parameter(torch.randn(1, self.num_cls_tokens, hidden_dim))
         self.seq_length += self.num_cls_tokens
 
         self.encoder = Encoder(
