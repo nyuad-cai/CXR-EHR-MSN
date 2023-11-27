@@ -198,3 +198,19 @@ def parse_weights(weights: Dict[str,torch.Tensor]) -> Dict[str,torch.Tensor]:
     del weights['class_token'] 
     del weights['encoder.pos_embedding']    
     return weights
+
+
+def parse_weights1(weights: Dict[str,torch.Tensor]) -> Dict[str,torch.Tensor]:
+    
+    for k in list(weights.keys()):
+
+        if k.startswith('backbone.'):
+            
+            if k.startswith('backbone.') and not k.startswith('backbone.heads'):
+                
+                weights[k[len("backbone."):]] = weights[k]
+                
+        del weights[k]
+#     del weights['class_token'] 
+#     del weights['encoder.pos_embedding']    
+    return weights

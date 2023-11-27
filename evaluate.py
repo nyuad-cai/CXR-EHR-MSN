@@ -8,8 +8,9 @@ from src.models.evaluationmodels import EvaluationModel
 from src.data.datsets import MIMICCXR
 from src.data.utils import train_transforms, val_test_transforms
 from torch.utils.data import  DataLoader
-from src.models.utils import parse_weights
+from src.models.utils import parse_weights1, parse_weights
 from torchvision.models import vit_b_16
+
 data_dir = os.getenv('DATA_DIR')
 
 paths = glob.glob(os.path.join(data_dir,'resized','**','*.jpg'), recursive=True)
@@ -56,16 +57,16 @@ test_dataloader = DataLoader(dataset=test_dataset,
 
 
 
-# backbone = VisionTransformer(image_size=224,
-#                              patch_size=16,
-#                              num_layers=12,
-#                              num_heads=6,
-#                              hidden_dim=768,
-#                              mlp_dim=768*4)
+backbone = VisionTransformer(image_size=224,
+                             patch_size=16,
+                             num_layers=12,
+                             num_heads=6,
+                             hidden_dim=768,
+                             mlp_dim=768*4)
 
-backbone = vit_b_16(pretrained=True)
 
-checkpoint_dir = '/scratch/sas10092/ChexMSN/models/lightning_logs/4178848-vit-small-lr=0.0000001/epoch=18-step=223383.ckpt'
+
+checkpoint_dir = os.getenv('CKPT_PATH')
 all_weights = torch.load(checkpoint_dir,map_location='cpu')['state_dict']
 
 weight = parse_weights(all_weights)
@@ -74,10 +75,10 @@ msg = backbone.load_state_dict(weight,strict=False)
 print(msg)
 
 model = EvaluationModel(backbone=backbone,
-                        learning_rate=0.00001,
+                        learning_rate=0.001,
                         weight_decay=0,
                         output_dim=14,
-                        freeze=False,
+                        freeze=True,
                         max_epochs=50)
 
 model.backbone.heads.head = nn.Linear(in_features=model.backbone.heads.head.in_features,
@@ -85,7 +86,8 @@ model.backbone.heads.head = nn.Linear(in_features=model.backbone.heads.head.in_f
 
 
 trainer = pl.Trainer(max_epochs=50,
-                     num_sanity_val_steps=0)
+                     num_sanity_val_steps=0,
+                     default_root_dir='/scratch/sas10092/ChexMSN/lightning_logs')
 
 
 

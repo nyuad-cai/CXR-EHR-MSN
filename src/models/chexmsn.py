@@ -3,7 +3,7 @@ import torch
 
 import torch.nn as nn
 import pytorch_lightning as pl
-import lightly.utils as utils
+import lightly.models.utils as utils
 from typing import List
 from src.models.utils import deactivate_requires_grad, update_momentum, random_token_mask
 from torch.utils.data import DataLoader
@@ -14,6 +14,7 @@ from lightly.loss import MSNLoss
 from lightly.models.modules.heads import MSNProjectionHead
 from lightly.models.modules.masked_autoencoder import MAEBackbone
 
+from src.models.visiontransformer import VisionTransformer
 
 class DenseBlock(nn.Module):
     def __init__(self,
@@ -39,9 +40,9 @@ class DenseBlock(nn.Module):
 
 class ProjectionHead(nn.Module):
     def __init__(self,
-                 in_features: int = 192,
-                 hidden_features: int = 768,
-                 out_features: int = 192,
+                 in_features: int = 768,
+                 hidden_features: int = 2048,
+                 out_features: int = 256,
                  bias : bool = False
                  ) -> None:
 
@@ -272,89 +273,149 @@ class ChexMSNModel(pl.LightningModule):
     
 
 class MSN(BenchmarkModule):
-    def __init__(self,
-               dataloader_kNN: DataLoader, 
-               num_classes: int = 2,
-               knn_k: int = 5,
-               knn_t: float = 0.1,
-               mask_ratio: float = 0.15,
-               lr : float = 0.1,
-               prototypes_num: int = 1024,
-               weight_decay: float = 0.0,
-               max_epochs: int = 100
-               ) -> None:
-        super().__init__(dataloader_kNN, num_classes,knn_k,knn_t)
-        #self.save_hyperparameters() 
-        self.weight_decay = weight_decay
-        self.mask_ratio = mask_ratio
-        self.lr = lr
-        self.prototypes_num = prototypes_num
-        self.max_epochs = max_epochs
+    pass
+    # def __init__(self,
+    #            dataloader_kNN: DataLoader, 
+    #            num_classes: int = 2,
+    #            knn_k: int = 5,
+    #            knn_t: float = 0.1,
+    #            mask_ratio: float = 0.15,
+    #            lr : float = 0.1,
+    #            prototypes_num: int = 1024,
+    #            weight_decay: float = 0.0,
+    #            max_epochs: int = 100
+    #            ) -> None:
+    #     super().__init__(dataloader_kNN, num_classes,knn_k,knn_t)
+    #     #self.save_hyperparameters() 
+    #     self.weight_decay = weight_decay
+    #     self.mask_ratio = mask_ratio
+    #     self.lr = lr
+    #     self.prototypes_num = prototypes_num
+    #     self.max_epochs = max_epochs
        
-        vit = torchvision.models.vit_b_16(pretrained=False)
-        self.backbone = MAEBackbone.from_vit(vit)
+    #     vit = torchvision.models.vit_b_16(weights=torchvision.models.ViT_B_16_Weights.DEFAULT)
+    #     self.backbone = MAEBackbone.from_vit(vit)
+    #     self.projection_head = MSNProjectionHead(768)
+
+    #     self.anchor_backbone = copy.deepcopy(self.backbone)
+    #     self.anchor_projection_head = copy.deepcopy(self.projection_head)
+
+    #     deactivate_requires_grad(self.backbone)
+    #     deactivate_requires_grad(self.projection_head)
+
+    #     self.prototypes = nn.Linear(256, self.prototypes_num, bias=False).weight
+    #     self.criterion = MSNLoss()
+
+    # def training_step(self, batch, batch_idx):
+    #     utils.update_momentum(self.anchor_backbone, self.backbone, 0.996)
+    #     utils.update_momentum(self.anchor_projection_head, self.projection_head, 0.996)
+
+    #     views, _, _ = batch
+    #     views = [view.to(self.device, non_blocking=True) for view in views]
+    #     targets = views[0]
+    #     anchors = views[1]
+    #     anchors_focal = torch.concat(views[2:], dim=0)
+
+    #     targets_out = self.backbone(targets)
+    #     targets_out = self.projection_head(targets_out)
+    #     anchors_out = self.encode_masked(anchors)
+    #     anchors_focal_out = self.encode_masked(anchors_focal)
+    #     anchors_out = torch.cat([anchors_out, anchors_focal_out], dim=0)
+
+    #     loss = self.criterion(anchors_out, targets_out, self.prototypes.data)
+    #     self.log("train_loss", loss, on_epoch= True,on_step=True , logger=True, prog_bar=True)
+    #     return loss
+    
+        
+
+    # def encode_masked(self, anchors):
+    #     batch_size, _, _, width = anchors.shape
+    #     seq_length = (width // self.anchor_backbone.patch_size) ** 2
+    #     idx_keep, _ = utils.random_token_mask(size=(batch_size, seq_length),
+    #                                           mask_ratio=self.mask_ratio,
+    #                                           device=self.device,
+    #                                           )
+    #     out = self.anchor_backbone(anchors, idx_keep)
+    #     return self.anchor_projection_head(out)
+    
+    
+
+    # def configure_optimizers(self):
+    #     params = [
+    #         *list(self.anchor_backbone.parameters()),
+    #         *list(self.anchor_projection_head.parameters()),
+    #         self.prototypes,
+    #     ]
+
+    #     optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr,weight_decay=self.weight_decay)
+    #     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,
+    #                                                            eta_min=0.00001,
+    #                                                            T_max=self.max_epochs
+    #                                                         )
+    #     return {'optimizer': optimizer,
+    #            'lr_scheduler': scheduler
+    #            }
+
+
+
+class MSN1(pl.LightningModule):
+    def __init__(self):
+        super().__init__()
+
+        # ViT small configuration (ViT-S/16)
+        self.mask_ratio = 0.15
+        # self.backbone = MAEBackbone(
+        #     image_size=224,
+        #     patch_size=16,
+        #     num_layers=12,
+        #     num_heads=6,
+        #     hidden_dim=384,
+        #     mlp_dim=384 * 4,
+        # )
+        # # or use a torchvision ViT backbone:
+        vit = VisionTransformer(num_heads=6,hidden_dim=768,mlp_dim=768*4,num_cls_tokens=1)
+        self.backbone = vit#MAEBackbone.from_vit(vit)
         self.projection_head = MSNProjectionHead(768)
 
         self.anchor_backbone = copy.deepcopy(self.backbone)
         self.anchor_projection_head = copy.deepcopy(self.projection_head)
 
-        utils.deactivate_requires_grad(self.backbone)
-        utils.deactivate_requires_grad(self.projection_head)
+        deactivate_requires_grad(self.backbone)
+        deactivate_requires_grad(self.projection_head)
 
-        self.prototypes = nn.Linear(256, self.prototypes_num, bias=False).weight
+        self.prototypes = nn.Linear(256, 1024, bias=False).weight
         self.criterion = MSNLoss()
 
     def training_step(self, batch, batch_idx):
-        utils.update_momentum(self.anchor_backbone, self.backbone, 0.996)
-        utils.update_momentum(self.anchor_projection_head, self.projection_head, 0.996)
+        update_momentum(self.anchor_backbone, self.backbone, 0.996)
+        update_momentum(self.anchor_projection_head, self.projection_head, 0.996)
 
-        views, _, _ = batch
+        views = batch[0]
         views = [view.to(self.device, non_blocking=True) for view in views]
         targets = views[0]
         anchors = views[1]
         anchors_focal = torch.concat(views[2:], dim=0)
 
-        targets_out = self.backbone(targets)
+        targets_out = self.backbone(targets,branch='anchor')
         targets_out = self.projection_head(targets_out)
         anchors_out = self.encode_masked(anchors)
         anchors_focal_out = self.encode_masked(anchors_focal)
         anchors_out = torch.cat([anchors_out, anchors_focal_out], dim=0)
 
         loss = self.criterion(anchors_out, targets_out, self.prototypes.data)
-        self.log("train_loss", loss, on_epoch= True,on_step=True , logger=True)
+        self.log("train_loss", loss, on_epoch= True,on_step=True , logger=True, prog_bar=True)
         return loss
-    
-        
 
     def encode_masked(self, anchors):
         batch_size, _, _, width = anchors.shape
         seq_length = (width // self.anchor_backbone.patch_size) ** 2
-        idx_keep, _ = utils.random_token_mask(size=(batch_size, seq_length),
-                                              mask_ratio=self.mask_ratio,
-                                              device=self.device,
-                                              )
-        out = self.anchor_backbone(anchors, idx_keep)
+        idx_keep, _ = utils.random_token_mask(
+            size=(batch_size, seq_length),
+            mask_ratio=self.mask_ratio,
+            device=self.device,
+        )
+        out = self.anchor_backbone(anchors,branch='anchor', idx_keep=idx_keep)
         return self.anchor_projection_head(out)
-    
-    
-    def validation_epoch_end(self, outputs):
-        device = self.dummy_param.device
-        if outputs:
-            total_num = torch.Tensor([0]).to(device)
-            total_top1 = torch.Tensor([0.]).to(device)
-            for (num, top1) in outputs:
-                total_num += num[0]
-                total_top1 += top1
-             
-            if dist.is_initialized() and dist.get_world_size() > 1:
-                dist.all_reduce(total_num)
-                dist.all_reduce(total_top1)
-
-            acc = float(total_top1.item() / total_num.item())
-            if acc > self.max_accuracy:
-                self.max_accuracy = acc
-            self.log('kNN_accuracy', acc * 100.0, prog_bar=True, on_epoch=True, logger=True,)
-
 
     def configure_optimizers(self):
         params = [
@@ -362,12 +423,5 @@ class MSN(BenchmarkModule):
             *list(self.anchor_projection_head.parameters()),
             self.prototypes,
         ]
-
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr,weight_decay=self.weight_decay)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,
-                                                               eta_min=0.00001,
-                                                               T_max=self.max_epochs
-                                                            )
-        return {'optimizer': optimizer,
-               'lr_scheduler': scheduler
-               }
+        optim = torch.optim.AdamW(params, lr=0.0001,weight_decay=0.001)
+        return optim

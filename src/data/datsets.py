@@ -125,7 +125,7 @@ class MIMICCXR(Dataset):
     
 
 
-transform=MSNTransform(cj_prob=0,random_crop_scale=0,gaussian_blur=0)
+transform=MSNTransform(cj_prob=0,random_gray_scale=0,gaussian_blur=0)
 
 
 class PretrainDataset(Dataset):
