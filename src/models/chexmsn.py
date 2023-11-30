@@ -235,7 +235,8 @@ class ChexMSNModel(pl.LightningModule):
         self.in_prototypes = self.model.projection_head.out_features
         self.prototypes = nn.ModuleList([nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False),
                                          nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False),
-                                         nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False)])
+                                         nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False)
+                                         ])
     
     
     def training_step(self, 

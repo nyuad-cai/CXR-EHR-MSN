@@ -40,7 +40,7 @@ lr = 0.0001
 # backbone options
 parser.add_argument('--image-size', '--is',type=int, default=224)
 parser.add_argument('--patch-size', '--ps',type=int, default=16)
-parser.add_argument('--num-layers', '--nl',type=int, default=6)
+parser.add_argument('--num-layers', '--nl',type=int, default=12)
 parser.add_argument('--num-heads', '--nh',type=int, default=nh)
 parser.add_argument('--hidden-dim', '--hd',type=int, default=hd)
 parser.add_argument('--mlp-dim', '--md',type=int, default=mlp)
@@ -50,7 +50,7 @@ parser.add_argument('--num-cls', '--cls',type=int, default=3)
 
 # projection head options
 parser.add_argument('--projection-in', '--pi',type=int, default=hd)
-parser.add_argument('--projection-hidden', '--ph',type=int, default=mlp)
+parser.add_argument('--projection-hidden', '--ph',type=int, default=2048)
 parser.add_argument('--projection-out', '--po',type=int, default=hd)
 
 # chexmsn options
@@ -60,11 +60,11 @@ parser.add_argument('--focal-views', '--fv', type=bool, default=True)
 
 #chexmsn loss options
 parser.add_argument('--temprature-ratio','--tr', type=float, default=0.1)
-parser.add_argument('--sinkhorn-iterations', '--si', type=int, default=1)
+parser.add_argument('--sinkhorn-iterations', '--si', type=int, default=0)
 parser.add_argument('--sim-weight','--sw', type=float, default=1.0)
 parser.add_argument('--age-weight','--aw', type=float, default=1.0)
 parser.add_argument('--gender-weight','--gw', type=float, default=1.0)
-parser.add_argument('--reg-weight','--rw', type=float, default=0.0)
+parser.add_argument('--reg-weight','--rw', type=float, default=5.0)
 
 
 # dataloader options
@@ -86,7 +86,7 @@ parser.add_argument('--mixed-precision', '--mp', type=int, default=16)
 # callbacks options
 parser.add_argument('--monitor-quantity','--mq', type=str, default='train_loss')
 parser.add_argument('--monitor-mode','--mm', type=str, default='min')
-parser.add_argument('--es-delta', '--esd', type=float, default=0.000001)
+parser.add_argument('--es-delta', '--esd', type=float, default=0.0000001)
 parser.add_argument('--es-patience','--esp', type=int, default=5)
 
 
