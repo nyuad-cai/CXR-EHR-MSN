@@ -327,7 +327,7 @@ class Encoder(nn.Module):
             mode="bicubic",
         )
         pos_embedding = pos_embedding.permute(0, 2, 3, 1).view(1, -1, dim)
-        return torch.cat((class_emb.unsqueeze(0), pos_embedding), dim=1)    
+        return torch.cat((class_emb.unsqueeze(0), pos_embedding), dim=1)   
     
 
 
@@ -473,7 +473,7 @@ class VisionTransformer(nn.Module):
             batch_class_token = self.class_token.expand(n, -1, -1)
             x = torch.cat([batch_class_token, x], dim=1)
             x = self.encoder(x)
-            return x[:,0:self.num_cls_tokens]
+            return torch.cat(list(x[:,:self.num_cls_tokens]))
         elif branch == 'anchor':
             batch_class_token = self.class_token.expand(n, -1, -1)
             x = torch.cat([batch_class_token, x], dim=1)

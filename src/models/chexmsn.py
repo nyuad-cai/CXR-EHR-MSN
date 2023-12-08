@@ -20,7 +20,7 @@ class DenseBlock(nn.Module):
         self.dense_block = nn.Sequential(nn.Linear(in_features= in_features,
                                                    out_features= out_features,
                                                bias=bias),
-                                         nn.LayerNorm(normalized_shape= out_features),
+                                         nn.BatchNorm1d(num_features=out_features),
                                          nn.GELU()
                                         )
     def forward(self,
@@ -62,6 +62,8 @@ class ProjectionHead(nn.Module):
         x = self.projection_head(x)
         return x
     
+
+
 class ChexMSN(nn.Module):
     def __init__(self,
                backbone: nn.Module,
@@ -101,7 +103,6 @@ class ChexMSN(nn.Module):
                         m = self.ema_p,
                        )
         projections = self._forward_all(batch=views,focal=self.focal)
-        
 
         return projections
 
@@ -142,10 +143,10 @@ class ChexMSN(nn.Module):
         target_view = batch[0][0].to('cuda')
         anchor_view_sim = batch[0][1].to('cuda')
         focal_views_sim = torch.concat(batch[0][2:],dim=0).to('cuda')
-        anchor_view_age = batch[1][1].to('cuda')
-        focal_views_age = torch.concat(batch[1][2:],dim=0).to('cuda')
-        anchor_view_gender = batch[2][1].to('cuda')
-        focal_views_gender = torch.concat(batch[2][2:],dim=0).to('cuda')
+        anchor_view_age = batch[1][1].to('cuda',non_blocking=True)
+        focal_views_age = torch.concat(batch[1][2:],dim=0).to('cuda',non_blocking=True)
+#         anchor_view_gender = batch[2][1].to('cuda',non_blocking=True)
+#         focal_views_gender = torch.concat(batch[2][2:],dim=0).to('cuda',non_blocking=True)
         
         
         target_projections = self._target_forward(target_view)
@@ -153,54 +154,47 @@ class ChexMSN(nn.Module):
         anchor_projections_sim = self._anchor_forward(anchor_view_sim)
         if focal:
             anchor_focal_projections_sim = self._anchor_forward(focal_views_sim)
-            similarity_projections = self._arrange_tokens(anchor_projections_sim,
-                                                          anchor_focal_projections_sim,
-                                                          num_focal = 10)
-                                                          
+            similarity_projections = torch.cat((anchor_projections_sim,anchor_focal_projections_sim),dim = 0)
         
         anchor_projections_age = self._anchor_forward(anchor_view_age)
         if focal:
             anchor_focal_projections_age =  self._anchor_forward(focal_views_age)
-            age_projections = self._arrange_tokens(anchor_projections_age,
-                                                   anchor_focal_projections_age,
-                                                   num_focal = 10)
+            age_projections = torch.cat((anchor_projections_age,anchor_focal_projections_age),dim = 0)
                                                     
         
         
-        anchor_projections_gender = self._anchor_forward(anchor_view_gender)
-        if focal:
-            anchor_focal_projections_gender = self._anchor_forward(focal_views_gender)  
-            gender_projections = self._arrange_tokens(anchor_projections_gender,
-                                                      anchor_focal_projections_gender,
-                                                      num_focal = 10)
+#         anchor_projections_gender = self._anchor_forward(anchor_view_gender)
+#         if focal:
+#             anchor_focal_projections_gender = self._anchor_forward(focal_views_gender)  
+#             gender_projections = torch.cat((anchor_projections_gender,anchor_focal_projections_gender),dim = 0)
                                                           
         if focal:
             anchor_projections = torch.stack((similarity_projections,
                                               age_projections,
-                                              gender_projections
+                                              #gender_projections
                                               ),
                                          dim= 0)
         else:
             anchor_projections = torch.stack((anchor_projections_sim,
                                               anchor_projections_age,
-                                              anchor_projections_gender
+                                              #anchor_projections_gender
                                               ),
                                              dim= 1)       
 
         return (anchor_projections,
                 target_projections)
     
-    def _arrange_tokens(self,
-                        tensor1: torch.Tensor,
-                        tensor2:torch.Tensor,
-                        num_focal: int = 10
-                        ) ->torch.Tensor:
+#     def _arrange_tokens(self,
+#                         tensor1: torch.Tensor,
+#                         tensor2:torch.Tensor,
+#                         num_focal: int = 10
+#                         ) ->torch.Tensor:
 
-        a = torch.stack(torch.split(tensor1,1),0)
-        b = torch.stack(torch.split(tensor2,num_focal),0)
-        c = torch.cat((a.expand(-1,num_focal,-1),b),dim=1)[:,num_focal-1:]
-        arranged_tokens = torch.cat(c.split(1),1).squeeze(0)
-        return arranged_tokens
+#         a = torch.stack(torch.split(tensor1,1),0)
+#         b = torch.stack(torch.split(tensor2,num_focal),0)
+#         c = torch.cat((a.expand(-1,num_focal,-1),b),dim=1)[:,num_focal-1:]
+#         arranged_tokens = torch.cat(c.split(1),1).squeeze(0)
+#         return arranged_tokens
     
 
 
@@ -227,18 +221,19 @@ class ChexMSNModel(pl.LightningModule):
         self.in_prototypes = self.model.projection_head.out_features
         self.prototypes = nn.ModuleList([nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False),
                                          nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False),
-                                         nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False)])
+#                                          nn.Linear(in_features=self.in_prototypes,out_features=num_prototypes,bias=False)
+                                        ])
     
-    
+#         self.prototypes1 = nn.Linear(in_features=self.in_prototypes,out_features=self.num_prototypes,bias=False).weight
     def training_step(self, 
                       batch: List[torch.Tensor], 
                       batch_idx: int
                      ) -> float:
         
-
+        
         anchors, target = self.model(batch) 
         loss = self.criterion(anchors,target,self.prototypes,focal=self.focal)
-        self.log("train_loss", loss, on_epoch= True,on_step=True, logger=True,)
+        self.log("train_loss", loss, on_epoch= True,on_step=True, logger=True,prog_bar=True)
         return loss
 
 
@@ -247,9 +242,10 @@ class ChexMSNModel(pl.LightningModule):
         params = [
             *list(self.model.backbone.parameters()),
             *list(self.model.projection_head.parameters()),
+#             self.prototypes
             self.prototypes[0].weight,
             self.prototypes[1].weight,
-            self.prototypes[2].weight,
+            #self.prototypes[2].weight,
         ]
         
         optimizer = torch.optim.AdamW(params, 
@@ -257,7 +253,7 @@ class ChexMSNModel(pl.LightningModule):
                                       weight_decay=self.weight_decay)
         
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,
-                                                               eta_min=0.00001,
+                                                               eta_min=0.00000,
                                                                T_max=self.max_epochs)
         return {'optimizer': optimizer,
                'lr_scheduler': scheduler

@@ -23,7 +23,6 @@ class ConvStemConfig(NamedTuple):
     norm_layer: Callable[..., nn.Module] = nn.BatchNorm2d
     activation_layer: Callable[..., nn.Module] = nn.ReLU
 
-
 def log_api_usage_once(obj: Any) -> None:
 
     """
@@ -84,7 +83,6 @@ def expand_index_like(index: torch.Tensor, tokens: torch.Tensor) -> torch.Tensor
     dim = tokens.shape[-1]
     index = index.unsqueeze(-1).expand(-1, -1, dim)
     return index
-
 
 def get_at_index(tokens: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
     """Selects tokens at index.

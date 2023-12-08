@@ -21,32 +21,36 @@ torch.set_float32_matmul_precision('high')
 
 # pl.seed_everything(24)
 
-csv_logger = CSVLogger(save_dir=os.path.join('./','models'),
-                       version = '-'.join([os.getenv('SLURM_JOBID'), os.getenv('RUN_NAME')]),
-                       flush_logs_every_n_steps=1)
+# csv_logger = CSVLogger(save_dir=os.path.join('./','models'),
+#                        version = '-'.join([os.getenv('SLURM_JOBID'), os.getenv('RUN_NAME')]),
+#                        flush_logs_every_n_steps=1)
 
-ckpt_save_dir = os.path.join('./','models','lightning_logs',
-                             '-'.join([os.getenv('SLURM_JOBID'), os.getenv('RUN_NAME')]))
+# ckpt_save_dir = os.path.join('./','models','lightning_logs',
+#                              '-'.join([os.getenv('SLURM_JOBID'), os.getenv('RUN_NAME')]))
 
 
 parser = argparse.ArgumentParser(description='SSL training command line interface')
-
-nh= 6
-hd= 192
-mlp = hd * 4
 lr = 0.000001
+wd = 0.0
+nh= 6
+hd= 768
+mlp = hd * 4
+sw = 0.75
+aw = 0.25
+rw = 0.5
+si = 3
 
 
 # backbone options
 parser.add_argument('--image-size', '--is',type=int, default=224)
 parser.add_argument('--patch-size', '--ps',type=int, default=16)
-parser.add_argument('--num-layers', '--nl',type=int, default=6)
+parser.add_argument('--num-layers', '--nl',type=int, default=12)
 parser.add_argument('--num-heads', '--nh',type=int, default=nh)
 parser.add_argument('--hidden-dim', '--hd',type=int, default=hd)
 parser.add_argument('--mlp-dim', '--md',type=int, default=mlp)
-parser.add_argument('--embed-dropout', '--ed',type=float, default=0.3)
-parser.add_argument('--attent-dropout', '--ad',type=float, default=0.3)
-parser.add_argument('--num-cls', '--cls',type=int, default=3)
+parser.add_argument('--embed-dropout', '--ed',type=float, default=0.0)
+parser.add_argument('--attent-dropout', '--ad',type=float, default=0.0)
+parser.add_argument('--num-cls', '--cls',type=int, default=2)
 
 # projection head options
 parser.add_argument('--projection-in', '--pi',type=int, default=hd)
@@ -60,17 +64,17 @@ parser.add_argument('--focal-views', '--fv', type=bool, default=True)
 
 #chexmsn loss options
 parser.add_argument('--temprature-ratio','--tr', type=float, default=0.1)
-parser.add_argument('--sinkhorn-iterations', '--si', type=int, default=0)
-parser.add_argument('--sim-weight','--sw', type=float, default=1.0)
-parser.add_argument('--age-weight','--aw', type=float, default=1.0)
-parser.add_argument('--gender-weight','--gw', type=float, default=1.0)
-parser.add_argument('--reg-weight','--rw', type=float, default=0.333)
+parser.add_argument('--sinkhorn-iterations', '--si', type=int, default=si)
+parser.add_argument('--sim-weight','--sw', type=float, default=sw)
+parser.add_argument('--age-weight','--aw', type=float, default=aw)
+#parser.add_argument('--gender-weight','--gw', type=float, default=1.0)
+parser.add_argument('--reg-weight','--rw', type=float, default=rw)
 
 
 # dataloader options
 parser.add_argument('--data-dir', '-dd',type=str, default=os.path.join('./','data','meta.csv'))
 parser.add_argument('--same-age', '--sa', type=bool, default=True)
-parser.add_argument('-b','--batch-size', type=int, default=32)
+parser.add_argument('-b','--batch-size', type=int, default=64)
 parser.add_argument('-w', '--num-workers', type=int, default=24)
 parser.add_argument('--pin-memory', '--pm', type=bool, default=True)
 
@@ -78,15 +82,15 @@ parser.add_argument('--pin-memory', '--pm', type=bool, default=True)
 #model options
 parser.add_argument('--num-prototypes', '--np', type=int, default=1024)
 parser.add_argument('--learning-rate','--lr', type=float, default=lr)
-parser.add_argument('--weight-decay','--wd', type=float, default=0)
+parser.add_argument('--weight-decay','--wd', type=float, default=wd)
 parser.add_argument('--max-epochs','--me', type=int, default=100)
-parser.add_argument('--mixed-precision', '--mp', type=int, default=16)
+parser.add_argument('--mixed-precision', '--mp', type=str, default='16-mixed')
 
 
 # callbacks options
 parser.add_argument('--monitor-quantity','--mq', type=str, default='train_loss')
 parser.add_argument('--monitor-mode','--mm', type=str, default='min')
-parser.add_argument('--es-delta', '--esd', type=float, default=0.000000000000000000000000000000000000000001)
+parser.add_argument('--es-delta', '--esd', type=float, default=0.0000000001)
 parser.add_argument('--es-patience','--esp', type=int, default=5)
 
 
@@ -124,8 +128,9 @@ criterion = MSNLoss(temperature=args.temprature_ratio,
                     sinkhorn_iterations=args.sinkhorn_iterations,
                     similarity_weight=args.sim_weight,
                     age_weight=args.age_weight,
-                    gender_weight=args.gender_weight,
+                    #gender_weight=args.gender_weight,
                     regularization_weight=args.reg_weight)
+
 
 transforms = MSNTransform()
 dataset = ChexMSNDataset(data_dir=args.data_dir,
@@ -147,9 +152,9 @@ model = ChexMSNModel(model=chexmsn,
 
 checkpoint_callback = ModelCheckpoint(monitor=args.monitor_quantity, 
                                       mode=args.monitor_mode,
-                                      every_n_epochs=1,
-                                      dirpath=ckpt_save_dir,
-                                      save_top_k=-1,)
+                                      #every_n_epochs=1,
+                                      #dirpath=ckpt_save_dir
+                                      )
 
 early_stop = EarlyStopping(monitor=args.monitor_quantity, 
                            min_delta=args.es_delta,
@@ -163,11 +168,12 @@ lr_logger = LearningRateMonitor(logging_interval='epoch')
 trainer = pl.Trainer(accelerator='auto', 
                      devices='auto',
                      strategy='auto',
-                     logger=csv_logger, 
+                     #logger=csv_logger, 
                      log_every_n_steps=1,
                      max_epochs=args.max_epochs,
-                     #precision=args.mixed_precision, 
+                     precision=args.mixed_precision, 
                      callbacks=[checkpoint_callback, lr_logger, early_stop],
+                     default_root_dir='./models'
                      )
 
 

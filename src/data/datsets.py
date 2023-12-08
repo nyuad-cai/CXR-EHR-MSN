@@ -1,3 +1,4 @@
+import os
 import torch
 import random
 import pandas as pd
@@ -7,7 +8,7 @@ from PIL import Image
 from typing import Tuple, Optional
 from torch.utils.data import Dataset
 from src.data.utils import preprocess
-
+from lightly.transforms.dino_transform import DINOTransform
 
 class ChexMSNDataset(Dataset):
     def __init__(self, 
@@ -32,9 +33,9 @@ class ChexMSNDataset(Dataset):
         
         target_path = self.all_images[index]
         image_id = target_path.split('/')[-1][:-4]
-        img_age_path, img_gender_path = self._retrieve_anchors(image_id=image_id,
-                                                               meta = self.meta,
-                                                               same=self.same)
+        img_age_path = self._retrieve_anchors(image_id=image_id,
+                                              meta = self.meta,
+                                              same=self.same)
 
         img_target = Image.open(fp=target_path).convert('RGB')
         img_target = self.transform(img_target)
@@ -42,10 +43,10 @@ class ChexMSNDataset(Dataset):
         img_age = Image.open(fp=img_age_path).convert('RGB')
         img_age = self.transform(img_age)
 
-        img_gender = Image.open(fp=img_gender_path).convert('RGB')
-        img_gender = self.transform(img_gender)
+#         img_gender = Image.open(fp=img_gender_path).convert('RGB')
+#         img_gender = self.transform(img_gender)
 
-        return (img_target,img_age,img_gender)
+        return (img_target,img_age)#,img_gender)
     
     
     def _retrieve_anchors(self,
@@ -65,18 +66,45 @@ class ChexMSNDataset(Dataset):
             candidate_anchors = candidate_anchors[candidate_anchors.subject_id != subject_id]
             images= list(candidate_anchors.path)
             sampled_images = random.sample(images,k=2)
-            image_age, image_gender = sampled_images[0],sampled_images[1]
-            return image_age, image_gender
+            #image_age, image_gender = sampled_images[0],sampled_images[1]
+            image_age = sampled_images[0]
+            return image_age#, image_gender
         else:
             candidate_anchors = group
             candidate_anchors = candidate_anchors[candidate_anchors.subject_id != subject_id]
             images= list(candidate_anchors.path)
             image_age = random.sample(images,k=1)[0]
-            candidate_anchors = candidate_anchors[candidate_anchors.gender == gender]
-            images= list(candidate_anchors.path)
-            image_gender = random.sample(images,k=1)[0]
-            return image_age, image_gender
+            #candidate_anchors = candidate_anchors[candidate_anchors.gender == gender]
+            #images= list(candidate_anchors.path)
+            #image_gender = random.sample(images,k=1)[0]
+            return image_age#, image_gender
         
+
+transform1 = DINOTransform(cj_prob=0,random_gray_scale=0,gaussian_blur=(0,0,0),sigmas=(0,0),solarization_prob=0)
+class BaselinesDataset(Dataset):
+    def __init__(self, 
+                 data_dir: str, 
+
+                 ) -> None:
+      
+        self.data_dir = data_dir
+        self.all_images = os.listdir(self.data_dir)
+        for image in self.all_images:
+            if image.startswith('._'):
+                self.all_images.remove(image)
+        
+    def __len__(self) -> int:
+        return len(self.all_images)
+    
+    def __getitem__(self,index: int
+                    ) -> Tuple[torch.Tensor]:
+        name = self.all_images[index]
+        path = os.path.join(self.data_dir, name)
+        img = Image.open(fp=path).convert('RGB')
+        img = transform1(img)
+        return img, index, name
+
+
 
 class MIMICCXR(Dataset):
     def __init__(self, 

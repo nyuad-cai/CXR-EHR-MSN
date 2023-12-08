@@ -101,14 +101,14 @@ def regularization_loss(mean_anchor_probs: torch.Tensor
     """Calculates mean entropy regularization loss."""
     loss = -torch.sum(torch.log(mean_anchor_probs ** (-mean_anchor_probs)))
     loss += math.log(float(len(mean_anchor_probs)))
-    return loss    
+    return loss
 
 
 
 class MSNLoss(nn.Module):
     def __init__(self,
                  temperature: float = 0.1,
-                 sinkhorn_iterations: int = 0,
+                 sinkhorn_iterations: int = 3,
                  similarity_weight: float = 1.0,
                  age_weight: float = 1.0,
                  gender_weight: float = 1.0,
@@ -122,7 +122,7 @@ class MSNLoss(nn.Module):
         self.sinkhorn_iterations = sinkhorn_iterations
         self.similarity_weight = similarity_weight
         self.age_weight = age_weight
-        self.gender_weight = gender_weight
+        #self.gender_weight = gender_weight
         self.regularization_weight = regularization_weight
 
         
@@ -134,22 +134,23 @@ class MSNLoss(nn.Module):
                 focal: bool = True
                       ) -> torch.Tensor:
         
-        similarity_loss = self.similarity_weight * self._forward_loss(anchors=anchors[0] if focal else anchors[:,0],
-                                                                      targets=targets[:,0],
+        targets = torch.stack([targets[::2,:],targets[1::2,:]])
+        similarity_loss = self.similarity_weight * self._forward_loss(anchors=anchors[0],#[0] if focal else anchors[:,0],
+                                                                      targets=targets[0],#[:,0],
                                                                       prototypes=prototypes[0].weight.data
-                                                                     )
+                                                                      )
 
-        age_loss = self.age_weight * self._forward_loss(anchors=anchors[1] if focal else anchors[:,1],
-                                                           targets=targets[:,1],
+        age_loss = self.age_weight * self._forward_loss(anchors=anchors[1],# if focal else anchors[:,1],
+                                                           targets=targets[1],
                                                            prototypes=prototypes[1].weight.data
                                                           )
 
-        gender_loss = self.gender_weight * self._forward_loss(anchors=anchors[2] if focal else anchors[:,2],
-                                                              targets=targets[:,2],
-                                                              prototypes=prototypes[2].weight.data
-                                                             )
+#         gender_loss = self.gender_weight * self._forward_loss(anchors=anchors[2] if focal else anchors[:,2],
+#                                                               targets=targets[:,2],
+#                                                               prototypes=prototypes[2].weight.data
+#                                                              )
 
-        loss = similarity_loss + age_loss + gender_loss
+        loss = similarity_loss + age_loss #+ gender_loss
         return loss
     
     def _forward_loss(self,
@@ -163,6 +164,8 @@ class MSNLoss(nn.Module):
         anchors = F.normalize(anchors, dim=1)
         targets = F.normalize(targets, dim=1)
         prototypes = F.normalize(prototypes, dim=1)
+        
+        
 
         anchor_probs = prototype_probabilities(anchors, 
                                                prototypes, 
@@ -179,7 +182,8 @@ class MSNLoss(nn.Module):
                 target_probs = sinkhorn(probabilities=target_probs,
                                         iterations=self.sinkhorn_iterations,
                                         )
-            target_probs = torch.repeat_interleave(target_probs, repeats=num_views, dim=0)
+#             target_probs = torch.repeat_interleave(target_probs, repeats=num_views, dim=0)
+            target_probs = target_probs.repeat((num_views, 1))
         
         loss = torch.mean(torch.sum(torch.log(anchor_probs ** (-target_probs)), dim=1))
 

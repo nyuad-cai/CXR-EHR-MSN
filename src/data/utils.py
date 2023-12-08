@@ -20,16 +20,16 @@ train_transforms = T.Compose([T.Resize(256),
                               T.RandomAffine(degrees=45, scale=(.85, 1.15), shear=0, translate=(0.15, 0.15)),
                               T.CenterCrop(224),
                               T.ToTensor(),
-                              T.Normalize(mean=MIMIC_NORMALIZE["mean"],
-                                          std=MIMIC_NORMALIZE["std"])                                                                   
+                              T.Normalize(mean=IMAGENET_STAT["mean"],
+                                          std=IMAGENET_STAT["std"])                                                                   
                             ])
 
 
 val_test_transforms = T.Compose([T.Resize(256),
                                  T.CenterCrop(224),
                                  T.ToTensor(),
-                                 T.Normalize(mean=MIMIC_NORMALIZE["mean"],
-                                             std=MIMIC_NORMALIZE["std"])                                                                
+                                 T.Normalize(mean=IMAGENET_STAT["mean"],
+                                             std=IMAGENET_STAT["std"])                                                                
                             ])
 
 class MSNTransform(MultiViewTransform):
@@ -87,7 +87,7 @@ class MSNTransform(MultiViewTransform):
         focal_crop_scale: Tuple[float, float] = (0.05, 0.3),
         hf_prob: float = 0.5,
         vf_prob: float = 0.0,
-        normalize: Dict[str, List[float]] = MIMIC_NORMALIZE,
+        normalize: Dict[str, List[float]] = IMAGENET_STAT,
     ):
         random_view_transform = MSNViewTransform(
             affine_dgrees=affine_dgrees,
@@ -127,7 +127,7 @@ class MSNViewTransform:
         crop_scale: Tuple[float, float] = (0.3, 1.0),
         hf_prob: float = 0.5,
         vf_prob: float = 0.0,
-        normalize: Dict[str, List[float]] = MIMIC_NORMALIZE,
+        normalize: Dict[str, List[float]] = IMAGENET_STAT,
     ):
 
         transform = [
