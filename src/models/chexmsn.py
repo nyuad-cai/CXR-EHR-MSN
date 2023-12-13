@@ -362,21 +362,19 @@ class MSN(BenchmarkModule):
 class MSN1(pl.LightningModule):
     def __init__(self):
         super().__init__()
-
+        hd = 768
         # ViT small configuration (ViT-S/16)
         self.mask_ratio = 0.15
-        # self.backbone = MAEBackbone(
-        #     image_size=224,
-        #     patch_size=16,
-        #     num_layers=12,
-        #     num_heads=6,
-        #     hidden_dim=384,
-        #     mlp_dim=384 * 4,
-        # )
-        # # or use a torchvision ViT backbone:
-        vit = VisionTransformer(num_heads=6,hidden_dim=768,mlp_dim=768*4,num_cls_tokens=1)
-        self.backbone = vit#MAEBackbone.from_vit(vit)
-        self.projection_head = MSNProjectionHead(768)
+        self.backbone = MAEBackbone(
+            image_size=224,
+            patch_size=16,
+            num_layers=12,
+            num_heads=6,
+            hidden_dim=hd,
+            mlp_dim=hd * 4,
+        )
+        
+        self.projection_head = MSNProjectionHead(hd,hd*4,hd)
 
         self.anchor_backbone = copy.deepcopy(self.backbone)
         self.anchor_projection_head = copy.deepcopy(self.projection_head)
@@ -384,7 +382,7 @@ class MSN1(pl.LightningModule):
         deactivate_requires_grad(self.backbone)
         deactivate_requires_grad(self.projection_head)
 
-        self.prototypes = nn.Linear(256, 1024, bias=False).weight
+        self.prototypes = nn.Linear(hd, 1024, bias=False).weight
         self.criterion = MSNLoss()
 
     def training_step(self, batch, batch_idx):
@@ -397,7 +395,7 @@ class MSN1(pl.LightningModule):
         anchors = views[1]
         anchors_focal = torch.concat(views[2:], dim=0)
 
-        targets_out = self.backbone(targets,branch='anchor')
+        targets_out = self.backbone(targets)
         targets_out = self.projection_head(targets_out)
         anchors_out = self.encode_masked(anchors)
         anchors_focal_out = self.encode_masked(anchors_focal)
@@ -415,7 +413,7 @@ class MSN1(pl.LightningModule):
             mask_ratio=self.mask_ratio,
             device=self.device,
         )
-        out = self.anchor_backbone(anchors,branch='anchor', idx_keep=idx_keep)
+        out = self.anchor_backbone(anchors, idx_keep=idx_keep)
         return self.anchor_projection_head(out)
 
     def configure_optimizers(self):

@@ -8,8 +8,9 @@ from src.models.evaluationmodels import EvaluationModel
 from src.data.datsets import MIMICCXR
 from src.data.utils import train_transforms, val_test_transforms
 from torch.utils.data import  DataLoader
-from src.models.utils import parse_weights1, parse_weights
+from src.models.utils import  parse_weights
 from torchvision.models import vit_b_16
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
 data_dir = os.getenv('DATA_DIR')
 
@@ -34,7 +35,7 @@ test_dataset = MIMICCXR(paths=paths,
 train_dataloader = DataLoader(dataset=train_dataset,
                              batch_size=64,
                              shuffle=True,
-                             num_workers=16,
+                             num_workers=24,
                              pin_memory=True,
                              drop_last=True
                              )
@@ -42,7 +43,7 @@ train_dataloader = DataLoader(dataset=train_dataset,
 val_dataloader = DataLoader(dataset=val_dataset,
                              batch_size=64,
                              shuffle=False,
-                             num_workers=16,
+                             num_workers=24,
                              pin_memory=True,
                              drop_last=True
                              )
@@ -50,7 +51,7 @@ val_dataloader = DataLoader(dataset=val_dataset,
 test_dataloader = DataLoader(dataset=test_dataset,
                              batch_size=64,
                              shuffle=False,
-                             num_workers=16,
+                             num_workers=24,
                              pin_memory=True,
                              drop_last=True
                              )
@@ -66,19 +67,30 @@ backbone = VisionTransformer(image_size=224,
 
 
 
-checkpoint_dir = os.getenv('CKPT_PATH')
-all_weights = torch.load(checkpoint_dir,map_location='cpu')['state_dict']
+# checkpoint_dir = os.getenv('CKPT_PATH')
+# all_weights = torch.load(checkpoint_dir,map_location='cpu')['state_dict']
 
-weight = parse_weights(all_weights)
+# weight = parse_weights(all_weights)
 
-msg = backbone.load_state_dict(weight,strict=False)
-print(msg)
+# msg = backbone.load_state_dict(weight,strict=False)
+# print(msg)
+
+checkpoint_callback = ModelCheckpoint(monitor='val_auroc', 
+                                      mode='max',
+                                      every_n_epochs=1,
+                                      save_top_k=1,
+                                     )
+early_stop = EarlyStopping(monitor='val_auroc', 
+                           min_delta=0.0001,
+                           mode='max', 
+                           patience=4
+                          )
 
 model = EvaluationModel(backbone=backbone,
-                        learning_rate=0.001,
-                        weight_decay=0,
+                        learning_rate=0.0005,
+                        weight_decay=0.001,
                         output_dim=14,
-                        freeze=True,
+                        freeze=False,
                         max_epochs=50)
 
 model.backbone.heads.head = nn.Linear(in_features=model.backbone.heads.head.in_features,
@@ -87,7 +99,9 @@ model.backbone.heads.head = nn.Linear(in_features=model.backbone.heads.head.in_f
 
 trainer = pl.Trainer(max_epochs=50,
                      num_sanity_val_steps=0,
-                     default_root_dir='/scratch/sas10092/ChexMSN/lightning_logs')
+                     default_root_dir='/scratch/sas10092/ChexMSN/notebooks/',
+                     callbacks=[checkpoint_callback, early_stop],
+                     )
 
 
 

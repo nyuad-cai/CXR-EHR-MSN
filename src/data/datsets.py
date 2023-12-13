@@ -122,7 +122,6 @@ class MIMICCXR(Dataset):
 
     def __len__(self):
         return len(self.filenames_loaded)
-    
 
 
 transform=MSNTransform(cj_prob=0,random_gray_scale=0,gaussian_blur=0)

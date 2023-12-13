@@ -3,12 +3,12 @@ import numpy as np
 import torch.nn as nn
 import torch.optim as optim
 import pytorch_lightning as pl
-
+import pandas as pd
 from torch import Tensor
 from lightly.models import utils
 from typing import List
 from sklearn.metrics import roc_auc_score, average_precision_score
-
+from src.models.utils import get_model_performance
 
 class EvaluationModel(pl.LightningModule):
     def __init__(self,
@@ -22,7 +22,7 @@ class EvaluationModel(pl.LightningModule):
                 ) -> None:
         super().__init__()
 
-
+        # self.save_hyperparameters() 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.max_epochs = max_epochs
@@ -66,18 +66,23 @@ class EvaluationModel(pl.LightningModule):
         self.train_step_preds.append(prediction)
 
         loss = nn.BCELoss()(prediction, label)            
-        self.log("train_loss", loss, on_epoch= True,on_step=False , logger=True,)
+        self.log("train_loss", loss, on_epoch= True,on_step=False , logger=True, prog_bar=True)
         
-        return loss
+        return {'loss':loss,
+                'pred':prediction,
+                'label':label}
 
     def on_train_epoch_end(self) -> None:
+
+
+        
         y = torch.cat(self.train_step_label).detach().cpu()
         pred = torch.cat(self.train_step_preds).detach().cpu()
 
         auroc = np.round(roc_auc_score(y, pred), 4)
         auprc = np.round(average_precision_score(y, pred), 4)   
-        self.log('train_auroc',auroc, on_epoch=True, on_step=False,logger=True)
-        self.log('train_auprc',auprc, on_epoch=True, on_step=False,logger=True)      
+        self.log('train_auroc',auroc, on_epoch=True, on_step=False,logger=True, prog_bar=True)
+        self.log('train_auprc',auprc, on_epoch=True, on_step=False,logger=True, prog_bar=True)      
         self.train_step_label.clear()
         self.train_step_preds.clear()
         
@@ -93,20 +98,21 @@ class EvaluationModel(pl.LightningModule):
         self.val_step_preds.append(prediction)
 
         loss = self._bce_loss(prediction, label,mode='val')       
-        self.log("val_loss", loss, on_epoch= True,on_step=False,logger=True)
+        self.log("val_loss", loss, on_epoch= True,on_step=False,logger=True, prog_bar=True)
 
-        return loss
+        return {'loss':loss,
+                'pred':prediction,
+                'label':label}
 
     def on_validation_epoch_end(self,*arg, **kwargs) -> None:
         
         y = torch.cat(self.val_step_label).detach().cpu()
         pred = torch.cat(self.val_step_preds).detach().cpu()
 
-
         auroc = np.round(roc_auc_score(y, pred), 4)
         auprc = np.round(average_precision_score(y, pred), 4)   
-        self.log('val_auroc',auroc, on_epoch=True, on_step=False, logger=True)
-        self.log('val_auprc',auprc, on_epoch=True, on_step=False, logger=True)    
+        self.log('val_auroc',auroc, on_epoch=True, on_step=False, logger=True, prog_bar=True)
+        self.log('val_auprc',auprc, on_epoch=True, on_step=False, logger=True, prog_bar=True)    
         self.val_step_label.clear()
         self.val_step_preds.clear()
         
@@ -121,11 +127,12 @@ class EvaluationModel(pl.LightningModule):
         self.test_step_preds.append(prediction)
         
         loss = self._bce_loss(prediction, label,mode='test')
-        self.log("test_loss", loss, on_epoch= True,on_step=False , logger=True)
+        self.log("test_loss", loss, on_epoch= True,on_step=False , logger=True, prog_bar=True)
 
         
-        return loss
-
+        return {'loss':loss,
+                'pred':prediction,
+                'label':label}
 
     def on_test_epoch_end(self,*arg, **kwargs) -> None:
         y = torch.cat(self.test_step_label).detach().cpu()
@@ -135,8 +142,13 @@ class EvaluationModel(pl.LightningModule):
         auroc = np.round(roc_auc_score(y, pred), 4)
         auprc = np.round(average_precision_score(y, pred), 4)   
         self.log('test_auroc',auroc, on_epoch=True, on_step=False, logger=True)
-        self.log('test_auprc',auprc, on_epoch=True, on_step=False, logger=True)   
+        self.log('test_auprc',auprc, on_epoch=True, on_step=False, logger=True) 
         
+        df = pd.DataFrame()
+        df['y_truth'] = y.tolist()
+        df['y_pred'] = pred.tolist()
+        get_model_performance(df)            
+          
         self.test_step_label.clear()
         self.test_step_preds.clear()
 

@@ -2,11 +2,11 @@ import torch
 import collections
 import torch.nn as nn
 import warnings
-
+import numpy as np
 from itertools import repeat
 from types import FunctionType
 from typing import Callable, NamedTuple, Any, Tuple, Optional, Union, Sequence, Dict
-
+from sklearn.metrics import roc_auc_score, average_precision_score
 
 # general utilities
 
@@ -188,22 +188,6 @@ def parse_weights(weights: Dict[str,torch.Tensor]) -> Dict[str,torch.Tensor]:
     
     for k in list(weights.keys()):
 
-        if k.startswith('model.target_backbone.'):
-            
-            if k.startswith('model.target_backbone') and not k.startswith('model.target_backbone.heads'):
-                
-                weights[k[len("model.target_backbone."):]] = weights[k]
-                
-        del weights[k]
-    del weights['class_token'] 
-    del weights['encoder.pos_embedding']    
-    return weights
-
-
-def parse_weights1(weights: Dict[str,torch.Tensor]) -> Dict[str,torch.Tensor]:
-    
-    for k in list(weights.keys()):
-
         if k.startswith('backbone.'):
             
             if k.startswith('backbone.') and not k.startswith('backbone.heads'):
@@ -214,3 +198,49 @@ def parse_weights1(weights: Dict[str,torch.Tensor]) -> Dict[str,torch.Tensor]:
 #     del weights['class_token'] 
 #     del weights['encoder.pos_embedding']    
     return weights
+
+
+
+
+def evaluate_new(df):
+    yt =np.array([np.array(x) for x in df['y_truth'].values])
+    yp =np.array([np.array(x) for x in df['y_pred'].values])
+    auroc = roc_auc_score(yt, yp)
+    auprc = average_precision_score(yt, yp)
+    return auprc, auroc
+
+def bootstraping_eval(df, num_iter):
+    """This function samples from the testing dataset to generate a list of performance metrics using bootstraping method"""
+    auroc_list = []
+    auprc_list = []
+    for _ in range(num_iter):
+        sample = df.sample(frac=1, replace=True)
+        auprc, auroc = evaluate_new(sample)
+        auroc_list.append(auroc)
+        auprc_list.append(auprc)
+    return auprc_list, auroc_list
+
+def computing_confidence_intervals(list_,true_value):
+
+    """This function calcualts the 95% Confidence Intervals"""
+    delta = (true_value - list_)
+    list(np.sort(delta))
+    delta_lower = np.percentile(delta, 97.5)
+    delta_upper = np.percentile(delta, 2.5)
+
+    upper = true_value - delta_upper
+    lower = true_value - delta_lower
+    return (upper,lower)
+
+def get_model_performance(df):
+    test_auprc, test_auroc = evaluate_new(df)
+    auprc_list, auroc_list = bootstraping_eval(df, num_iter=1000)
+    upper_auprc, lower_auprc = computing_confidence_intervals(auprc_list, test_auprc)
+    upper_auroc, lower_auroc = computing_confidence_intervals(auroc_list, test_auroc)
+    print("--------------")
+    text_a=str(f"AUROC {round(test_auroc, 3)} ({round(lower_auroc, 3)}, {round(upper_auroc, 3)}) CI 95%")
+    text_b=str(f"AUPRC {round(test_auprc, 3)} ({round(lower_auprc, 3)}, {round(upper_auprc, 3)}) CI 95% ")
+    print(text_a)
+    print(text_b)
+
+    return (test_auprc, upper_auprc, lower_auprc), (test_auroc, upper_auroc, lower_auroc), (text_a,text_b)

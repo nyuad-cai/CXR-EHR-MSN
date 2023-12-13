@@ -20,16 +20,16 @@ train_transforms = T.Compose([T.Resize(256),
                               T.RandomAffine(degrees=45, scale=(.85, 1.15), shear=0, translate=(0.15, 0.15)),
                               T.CenterCrop(224),
                               T.ToTensor(),
-                              T.Normalize(mean=MIMIC_NORMALIZE["mean"],
-                                          std=MIMIC_NORMALIZE["std"])                                                                   
+                              T.Normalize(mean=IMAGENET_STAT["mean"],
+                                          std=IMAGENET_STAT["std"])                                                                   
                             ])
 
 
 val_test_transforms = T.Compose([T.Resize(256),
                                  T.CenterCrop(224),
                                  T.ToTensor(),
-                                 T.Normalize(mean=MIMIC_NORMALIZE["mean"],
-                                             std=MIMIC_NORMALIZE["std"])                                                                
+                                 T.Normalize(mean=IMAGENET_STAT["mean"],
+                                             std=IMAGENET_STAT["std"])                                                                
                             ])
 
 class MSNTransform(MultiViewTransform):
