@@ -11,8 +11,6 @@ from lightly.transforms.multi_view_transform import MultiViewTransform
 IMAGENET_STAT = {"mean":torch.tensor([0.4884, 0.4550, 0.4171]),
                  "std":torch.tensor([0.2596, 0.2530, 0.2556])}
 
-MIMIC_NORMALIZE ={"mean":torch.tensor([0.4723, 0.4723, 0.4723]), 
-                  "std":torch.tensor([0.3023, 0.3023, 0.3023])}
 
 
 train_transforms = T.Compose([T.Resize(256),
@@ -132,9 +130,9 @@ class MSNViewTransform:
 
         transform = [
             T.RandomAffine(degrees=affine_dgrees, 
-                           scale=affine_scale, 
-                           shear=affine_shear, 
-                           translate=affine_translate),
+                          scale=affine_scale, 
+                          shear=affine_shear, 
+                          translate=affine_translate),
             T.RandomResizedCrop(size=crop_size, scale=crop_scale),
             T.RandomHorizontalFlip(p=hf_prob),
             T.RandomVerticalFlip(p=vf_prob),

@@ -1,6 +1,7 @@
 import os
 import torch
 import random
+import numpy as np
 import pandas as pd
 import torch.nn as nn
 import torchvision.transforms as T
@@ -10,77 +11,41 @@ from torch.utils.data import Dataset
 from src.data.utils import preprocess
 from lightly.transforms.dino_transform import DINOTransform
 
+
 class ChexMSNDataset(Dataset):
     def __init__(self, 
                  data_dir: str,
                  transforms: nn.Module,
-                 same = True
                  ) -> None:
       
         self.meta = pd.read_csv(data_dir)
-        self.all_images = list(self.meta.path)
-        self.transform = transforms
-        self.same = same
+        self.transforms = transforms
+        self.ehr = self.meta.to_numpy()[:,1:].astype('float32')
+
         
     def __len__(self
                 ) -> int:
-        return len(self.all_images)
+        return len(self.meta)
     
     def __getitem__(self,
                     index: int
                     ) -> Tuple[torch.Tensor]:
 
         
-        target_path = self.all_images[index]
-        image_id = target_path.split('/')[-1][:-4]
-        img_age_path = self._retrieve_anchors(image_id=image_id,
-                                              meta = self.meta,
-                                              same=self.same)
+        img = self.meta['path'][index]
+        img = Image.open(fp=img).convert('RGB')
+        img = self.transforms(img)
+        ehr = torch.from_numpy(self.ehr[index])
 
-        img_target = Image.open(fp=target_path).convert('RGB')
-        img_target = self.transform(img_target)
         
-        img_age = Image.open(fp=img_age_path).convert('RGB')
-        img_age = self.transform(img_age)
+        return img, ehr
 
-#         img_gender = Image.open(fp=img_gender_path).convert('RGB')
-#         img_gender = self.transform(img_gender)
 
-        return (img_target,img_age)#,img_gender)
-    
-    
-    def _retrieve_anchors(self,
-                          image_id: str,
-                          meta: pd.DataFrame,
-                          same: bool = False) -> Tuple[str]:
-        record = meta[meta.dicom_id == image_id]
-    
-        subject_id = list(record.subject_id)[0]
-        age_groub =list(record.ageR5)[0] 
-        gender = list(record.gender)[0]
-    
-        group = meta[meta.ageR5 == age_groub]
-    
-        if same:
-            candidate_anchors = group[group.gender == gender]
-            candidate_anchors = candidate_anchors[candidate_anchors.subject_id != subject_id]
-            images= list(candidate_anchors.path)
-            sampled_images = random.sample(images,k=2)
-            #image_age, image_gender = sampled_images[0],sampled_images[1]
-            image_age = sampled_images[0]
-            return image_age#, image_gender
-        else:
-            candidate_anchors = group
-            candidate_anchors = candidate_anchors[candidate_anchors.subject_id != subject_id]
-            images= list(candidate_anchors.path)
-            image_age = random.sample(images,k=1)[0]
-            #candidate_anchors = candidate_anchors[candidate_anchors.gender == gender]
-            #images= list(candidate_anchors.path)
-            #image_gender = random.sample(images,k=1)[0]
-            return image_age#, image_gender
+
+
         
 
-transform1 = DINOTransform(cj_prob=0,random_gray_scale=0,gaussian_blur=(0,0,0),sigmas=(0,0),solarization_prob=0)
+transform = DINOTransform(cj_prob=0,random_gray_scale=0,gaussian_blur=(0,0,0),sigmas=(0,0),solarization_prob=0)
 class BaselinesDataset(Dataset):
     def __init__(self, 
                  data_dir: str, 
@@ -101,7 +66,7 @@ class BaselinesDataset(Dataset):
         name = self.all_images[index]
         path = os.path.join(self.data_dir, name)
         img = Image.open(fp=path).convert('RGB')
-        img = transform1(img)
+        img = transform(img)
         return img, index, name
 
 
@@ -123,7 +88,7 @@ class MIMICCXR(Dataset):
                                                split=split
                                               )
         limit = (round(len(self.filenames_loaded) * percentage))
-        self.filenames_loaded = self.filenames_loaded[0:limit]
+        self.filenames_loaded = random.sample(self.filenames_loaded,limit)
  
         
     def __getitem__(self, index):
@@ -148,3 +113,36 @@ class MIMICCXR(Dataset):
 
     def __len__(self):
         return len(self.filenames_loaded)
+    
+
+
+class NIHDataset(Dataset):
+    def __init__(self, root, data_path, transform=None):
+        self.root = root
+        self.df = pd.read_csv(data_path)
+        self.transform = transform
+        
+        file = open(self.root)
+        images = file.read().splitlines()
+        
+        ids = []
+        
+        for idx, path in enumerate(self.df['Image']):
+            if path.split('/')[-1] in images:
+                ids.append(idx)
+        
+        self.df = self.df.iloc[ids, :].reset_index(drop=True)
+        self.images = self.df['Image'].values
+        self.labels = self.df.iloc[:, 1:].values
+        labels = list(map(lambda x: x.lower(), self.df.columns[1:]))
+        self.classes = {v: k for k, v in enumerate(labels)}
+        
+    def __getitem__(self, item):
+        img = Image.open(self.images[item]).convert('RGB')
+        if self.transform is not None:
+            img = self.transform(img)
+            
+        return img, torch.tensor(self.labels[item], dtype=torch.float32)
+    
+    def __len__(self):
+        return len(self.df)

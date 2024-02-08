@@ -5,14 +5,13 @@ import pytorch_lightning as pl
 
 
 
-from src.models.visiontransformer import VisionTransformer
-from src.models.chexmsn import ProjectionHead, ChexMSN, ChexMSNModel 
+
 from src.models.losses import MSNLoss
-from src.models.utils import ConvStemConfig
+
 from torch.utils.data import DataLoader
 from src.data.datsets import ChexMSNDataset
 from pytorch_lightning.loggers import  CSVLogger
-from src.models.chexmsn import ChexMSN
+from src.models.chexmsn import MSN1
 from src.data.utils import MSNTransform
 
 
@@ -30,32 +29,24 @@ torch.set_float32_matmul_precision('high')
 
 
 parser = argparse.ArgumentParser(description='SSL training command line interface')
-lr = 0.000001
-wd = 0.0
-nh= 6
-hd= 768
-mlp = hd * 4
-sw = 0.75
-aw = 0.25
-rw = 0.5
-si = 3
+
 
 
 # backbone options
 parser.add_argument('--image-size', '--is',type=int, default=224)
 parser.add_argument('--patch-size', '--ps',type=int, default=16)
 parser.add_argument('--num-layers', '--nl',type=int, default=12)
-parser.add_argument('--num-heads', '--nh',type=int, default=nh)
-parser.add_argument('--hidden-dim', '--hd',type=int, default=hd)
-parser.add_argument('--mlp-dim', '--md',type=int, default=mlp)
+parser.add_argument('--num-heads', '--nh',type=int, default=6)
+parser.add_argument('--hidden-dim', '--hd',type=int, default=192)
+parser.add_argument('--mlp-dim', '--md',type=int, default=192*4)
 parser.add_argument('--embed-dropout', '--ed',type=float, default=0.0)
 parser.add_argument('--attent-dropout', '--ad',type=float, default=0.0)
-parser.add_argument('--num-cls', '--cls',type=int, default=2)
+#parser.add_argument('--num-cls', '--cls',type=int, default=2)
 
 # projection head options
-parser.add_argument('--projection-in', '--pi',type=int, default=hd)
-parser.add_argument('--projection-hidden', '--ph',type=int, default=mlp)
-parser.add_argument('--projection-out', '--po',type=int, default=hd)
+parser.add_argument('--projection-in', '--pi',type=int, default=192)
+parser.add_argument('--projection-hidden', '--ph',type=int, default=192*4)
+parser.add_argument('--projection-out', '--po',type=int, default=19)
 
 # chexmsn options
 parser.add_argument('--mask-ratio','--mr', type=float, default=0.15)
@@ -64,11 +55,11 @@ parser.add_argument('--focal-views', '--fv', type=bool, default=True)
 
 #chexmsn loss options
 parser.add_argument('--temprature-ratio','--tr', type=float, default=0.1)
-parser.add_argument('--sinkhorn-iterations', '--si', type=int, default=si)
-parser.add_argument('--sim-weight','--sw', type=float, default=sw)
-parser.add_argument('--age-weight','--aw', type=float, default=aw)
+parser.add_argument('--sinkhorn-iterations', '--si', type=int, default=3)
+# parser.add_argument('--sim-weight','--sw', type=float, default=sw)
+# parser.add_argument('--age-weight','--aw', type=float, default=aw)
 #parser.add_argument('--gender-weight','--gw', type=float, default=1.0)
-parser.add_argument('--reg-weight','--rw', type=float, default=rw)
+parser.add_argument('--reg-weight','--rw', type=float, default=1)
 
 
 # dataloader options
@@ -81,8 +72,8 @@ parser.add_argument('--pin-memory', '--pm', type=bool, default=True)
 
 #model options
 parser.add_argument('--num-prototypes', '--np', type=int, default=1024)
-parser.add_argument('--learning-rate','--lr', type=float, default=lr)
-parser.add_argument('--weight-decay','--wd', type=float, default=wd)
+parser.add_argument('--learning-rate','--lr', type=float, default=0.0001)
+parser.add_argument('--weight-decay','--wd', type=float, default=0.001)
 parser.add_argument('--max-epochs','--me', type=int, default=100)
 parser.add_argument('--mixed-precision', '--mp', type=str, default='16-mixed')
 
@@ -90,70 +81,32 @@ parser.add_argument('--mixed-precision', '--mp', type=str, default='16-mixed')
 # callbacks options
 parser.add_argument('--monitor-quantity','--mq', type=str, default='train_loss')
 parser.add_argument('--monitor-mode','--mm', type=str, default='min')
-parser.add_argument('--es-delta', '--esd', type=float, default=0.0000000001)
-parser.add_argument('--es-patience','--esp', type=int, default=5)
+parser.add_argument('--es-delta', '--esd', type=float, default=0.00000000001)
+parser.add_argument('--es-patience','--esp', type=int, default=15)
 
 
 
 args = parser.parse_args()
 
 
-# stemconfig = [ConvStemConfig(out_channels= 64, kernel_size = 3 , stride = 2) for i in range(4)]
-
-backbone = VisionTransformer(image_size=args.image_size,
-                             patch_size=args.patch_size,
-                             num_layers=args.num_layers,
-                             num_heads=args.num_heads,
-                             hidden_dim=args.hidden_dim,
-                             mlp_dim=args.mlp_dim,
-                             dropout=args.embed_dropout,
-                             attention_dropout=args.attent_dropout,
-                             num_cls_tokens=args.num_cls,
-                            #  conv_stem_configs=stemconfig
-                             )
-
-projection_head = ProjectionHead(in_features=args.projection_in,
-                                 hidden_features=args.projection_hidden,
-                                 out_features=args.projection_out)
-
-
-chexmsn = ChexMSN(backbone=backbone,
-                  projection_head=projection_head,
-                  masking_ratio=args.mask_ratio,
-                  ema_p=args.exponent_average,
-                  focal=args.focal_views)
-
-
-criterion = MSNLoss(temperature=args.temprature_ratio,
-                    sinkhorn_iterations=args.sinkhorn_iterations,
-                    similarity_weight=args.sim_weight,
-                    age_weight=args.age_weight,
-                    #gender_weight=args.gender_weight,
-                    regularization_weight=args.reg_weight)
-
 
 transforms = MSNTransform()
-dataset = ChexMSNDataset(data_dir=args.data_dir,
-                         transforms= transforms,
-                         same=args.same_age)
+dataset = ChexMSNDataset(data_dir=os.getenv('DATA_DIR'),
+                         transforms= transforms)
 
 dataloader = DataLoader(dataset=dataset,
-                       batch_size=args.batch_size,
-                       num_workers=args.num_workers,
-                       pin_memory=args.pin_memory)
+                              batch_size=64,
+                              num_workers=24,
+                              pin_memory=True,
+                              shuffle=True
+                              )
 
-model = ChexMSNModel(model=chexmsn,
-                     criterion=criterion,
-                     num_prototypes=args.num_prototypes,
-                     learning_rate=args.learning_rate,
-                     weight_decay=args.weight_decay,
-                     max_epochs=args.max_epochs,
-                     focal=args.focal_views)
+model = MSN1()
 
 checkpoint_callback = ModelCheckpoint(monitor=args.monitor_quantity, 
                                       mode=args.monitor_mode,
-                                      #every_n_epochs=1,
-                                      #dirpath=ckpt_save_dir
+                                      every_n_epochs=1,
+                                      save_top_k=1,
                                       )
 
 early_stop = EarlyStopping(monitor=args.monitor_quantity, 
@@ -161,7 +114,6 @@ early_stop = EarlyStopping(monitor=args.monitor_quantity,
                            mode=args.monitor_mode, 
                            patience=args.es_patience)
 
-lr_logger = LearningRateMonitor(logging_interval='epoch')
 
 
 
@@ -170,10 +122,10 @@ trainer = pl.Trainer(accelerator='auto',
                      strategy='auto',
                      #logger=csv_logger, 
                      log_every_n_steps=1,
-                     max_epochs=args.max_epochs,
-                     precision=args.mixed_precision, 
-                     callbacks=[checkpoint_callback, lr_logger, early_stop],
-                     default_root_dir='./models'
+                     max_epochs=100,
+                     precision='16-mixed', 
+                     callbacks=[checkpoint_callback],
+                     default_root_dir='./models/'
                      )
 
 
