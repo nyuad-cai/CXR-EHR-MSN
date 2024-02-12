@@ -4,9 +4,10 @@ import torch
 import argparse
 import pytorch_lightning as pl
 import torch.nn as nn
+
 from torchvision.models.vision_transformer import VisionTransformer
 from src.models.evaluationmodels import EvaluationModel
-from src.data.datsets import MIMICCXR,NIHDataset
+from src.data.datsets import MIMICCXR,CheXpertDataset, NIHDataset
 from src.data.utils import train_transforms, val_test_transforms
 from torch.utils.data import  DataLoader
 from src.models.utils import parse_weights
@@ -16,71 +17,70 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import CSVLogger
 pl.seed_everything(24)
 
-data_dir = os.getenv('DATA_DIR')
+
 
 
 parser = argparse.ArgumentParser(description='SSL evaluation command line interface')
 
-
-
-
-# data loading options
-
-parser.add_argument('--data-percent','--dp', type=float, default=0.05, metavar='PERCENT',
-                    help='dataset percentage | default: (0.05)'
-                   )
-
-# model options
-
-
-parser.add_argument('--learning-rate','--lr', type=float, default=0.0001,
-                    help='model learning rate | default: (0.01)'
-                   )
-
-parser.add_argument('-f','--freeze', type=int, default=1, 
-                    help='enables linear evaluation | default: (True)'
-                   )
-parser.add_argument('-s','--scheduler', type=str, default='cosine',
-                    help='enables linear evaluation | default: (True)'
-                   )
-parser.add_argument('-d','--dim', type=int, default=192, 
-                    help='enables linear evaluation | default: (True)'
-                   )
+parser.add_argument('--dim', type=int, default=192)
+parser.add_argument('--freeze', type=int, default=1)
+parser.add_argument('--dataset', type=str, default='mimic')
+parser.add_argument('--log-dir', type=str, default='./logs')
+parser.add_argument('--scheduler', type=str, default='cosine')
+parser.add_argument('--data-percent', type=float, default=1.0)
+parser.add_argument('--learning-rate', type=float, default=0.0001)
 
 args = parser.parse_args()
 
-
-# paths = glob.glob(os.path.join(data_dir,'resized','**','*.jpg'), recursive=True)
-# train_dataset = MIMICCXR(paths=paths,
-#                          data_dir= data_dir, 
-#                          split='train', 
-#                          transform=train_transforms,
-#                          percentage=float(args.data_percent)
-#                          )
-# val_dataset = MIMICCXR(paths=paths,
-#                         data_dir=data_dir, 
-#                         split='validate', 
-#                         transform=val_test_transforms,
-#                         )
-# test_dataset = MIMICCXR(paths=paths,
-#                         data_dir=data_dir, 
-#                         split='test', 
-#                         transform=val_test_transforms,
-#                         )
-
-
-train_dataset = NIHDataset(root=data_dir,
-                           data_path=data_dir,
-                           transform=train_transforms)
-
-val_dataset = NIHDataset(root=data_dir,
-                           data_path=data_dir,
+if args.dataset == 'mimic':
+    mimic_data_dir = ''
+    paths = glob.glob(os.path.join(mimic_data_dir,'resized','**','*.jpg'), recursive=True)
+    train_dataset = MIMICCXR(paths=paths,
+                         data_dir= mimic_data_dir, 
+                         split='train', 
+                         transform=train_transforms,
+                         percentage=float(args.data_percent))
+    val_dataset = MIMICCXR(paths=paths,
+                           data_dir=mimic_data_dir, 
+                           split='validate', 
                            transform=val_test_transforms)
+    test_dataset = MIMICCXR(paths=paths,
+                            data_dir=mimic_data_dir, 
+                            split='test', 
+                            transform=val_test_transforms)
 
-test_dataset = NIHDataset(root=data_dir,
-                           data_path=data_dir,
-                           transform=val_test_transforms)
 
+
+elif args.dataset == 'nih':
+    nih_data_dir = ''
+    nih_train_labels = ''
+    nih_val_labels = ''
+    nih_test_labels = ''
+    train_dataset = NIHDataset(root=nih_data_dir,
+                             data_path=nih_train_labels,
+                             transform=train_transforms)
+
+    val_dataset = NIHDataset(root=nih_data_dir,
+                             data_path=nih_val_labels,
+                             transform=val_test_transforms)
+
+    test_dataset = NIHDataset(root=nih_data_dir,
+                            data_path=nih_test_labels,
+                            transform=val_test_transforms)
+    
+
+elif args.dataset == 'chexpert':
+    chexpert_data_dir = ''
+    ckpt_path = ''
+    chexpert_dataset = CheXpertDataset(data_path=chexpert_data_dir,
+                               transform=val_test_transforms)
+
+    chexpert_dataloader = DataLoader(dataset=chexpert_dataset,
+                                     batch_size=len(chexpert_dataset),
+                                     shuffle=False,
+                                     num_workers=24,
+                                     pin_memory=True)
+    
 
 train_dataloader = DataLoader(dataset=train_dataset,
                              batch_size=64,
@@ -115,11 +115,10 @@ backbone = VisionTransformer(image_size=224,
                              hidden_dim=args.dim,
                              mlp_dim=args.dim*4)
 
-# backbone = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224-in21k')
 
-checkpoint_dir = os.getenv('CKPT_PATH')
-all_weights = torch.load(checkpoint_dir,map_location='cpu')['state_dict']
 
+ckpt_path = ''
+all_weights = torch.load(ckpt_path,map_location='cpu')['state_dict']
 weight = parse_weights(all_weights)
 
 msg = backbone.load_state_dict(weight,strict=False)
@@ -137,8 +136,8 @@ checkpoint_callback = ModelCheckpoint(monitor='val_auroc',
                                       save_top_k=1,
                                      )
 
-logger = CSVLogger(save_dir= f'/scratch/sas10092/ChexMSN/notebooks/nih/{os.getenv("VARS")}/{os.getenv("BACKBONE")}',
-                    version=os.getenv('SLURM_JOB_ID'))
+logger = CSVLogger(save_dir= args.log_dir)
+
 
 model = EvaluationModel(backbone=backbone,
                         learning_rate=args.learning_rate,
@@ -147,7 +146,7 @@ model = EvaluationModel(backbone=backbone,
                         freeze=args.freeze,
                         max_epochs=50,
                         scheduler=args.scheduler,
-                        summary_path=f'/scratch/sas10092/ChexMSN/notebooks/nih/{os.getenv("VARS")}/{os.getenv("BACKBONE")}/lightning_logs/{logger.version}')
+                        summary_path=os.path.join(args.log_dir,'lightning_logs',logger.version))
 
 model.backbone.heads.head= nn.Linear(in_features=model.backbone.heads.head.in_features,
                                       out_features=model.output_dim)
@@ -159,7 +158,10 @@ trainer = pl.Trainer(max_epochs=50,
                      logger=logger,
                      )
 
+if args.dataset in ['mimic','nih']:
 
-print(args.freeze,args.learning_rate,args.dim,args.scheduler)
-trainer.fit(model=model, train_dataloaders=train_dataloader,val_dataloaders=val_dataloader)
-trainer.test(model=model,dataloaders=test_dataloader,ckpt_path='best')
+    trainer.fit(model=model, train_dataloaders=train_dataloader,val_dataloaders=val_dataloader)
+    trainer.test(model=model,dataloaders=test_dataloader,ckpt_path='best')
+
+elif args.dataset == 'chexpert':
+    trainer.test(model=model,dataloaders=chexpert_dataloader,ckpt_path=ckpt_path)

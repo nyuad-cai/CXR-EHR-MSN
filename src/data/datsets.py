@@ -1,18 +1,19 @@
 import os
 import torch
 import random
-import numpy as np
+
 import pandas as pd
 import torch.nn as nn
 import torchvision.transforms as T
+
 from PIL import Image
 from typing import Tuple, Optional
 from torch.utils.data import Dataset
 from src.data.utils import preprocess
-from lightly.transforms.dino_transform import DINOTransform
 
 
-class ChexMSNDataset(Dataset):
+
+class CxrEhrDataset(Dataset):
     def __init__(self, 
                  data_dir: str,
                  transforms: nn.Module,
@@ -45,13 +46,13 @@ class ChexMSNDataset(Dataset):
 
         
 
-transform = DINOTransform(cj_prob=0,random_gray_scale=0,gaussian_blur=(0,0,0),sigmas=(0,0),solarization_prob=0)
+
 class BaselinesDataset(Dataset):
     def __init__(self, 
                  data_dir: str, 
-
+                 transform: nn.Module
                  ) -> None:
-      
+        self.transforms = transform
         self.data_dir = data_dir
         self.all_images = os.listdir(self.data_dir)
         for image in self.all_images:
@@ -66,7 +67,7 @@ class BaselinesDataset(Dataset):
         name = self.all_images[index]
         path = os.path.join(self.data_dir, name)
         img = Image.open(fp=path).convert('RGB')
-        img = transform(img)
+        img = self.transform(img)
         return img, index, name
 
 
@@ -114,6 +115,25 @@ class MIMICCXR(Dataset):
     def __len__(self):
         return len(self.filenames_loaded)
     
+class CheXpertDataset(Dataset):
+    def __init__(self, 
+                 data_path: str,
+                 transform: Optional[T.Compose] = None, 
+                 ) -> None:
+        
+        self.transform = transform
+        
+        self.data = pd.read_csv(data_path)
+        
+    def __getitem__(self, index):
+        img = Image.open(self.data['Path'][index]).convert('RGB')
+        labels = self.data.iloc[index,1:].to_numpy().astype('float32')
+        img = self.transform(img)
+        return img, labels
+
+    def __len__(self):
+        return len(self.data)
+
 
 
 class NIHDataset(Dataset):

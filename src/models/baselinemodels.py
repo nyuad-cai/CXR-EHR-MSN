@@ -1,31 +1,53 @@
 import copy
 import torch
+
 import torch.nn as nn
 import pytorch_lightning as pl
 import lightly.models.utils as utils
+
 from lightly.loss import MSNLoss, DINOLoss
 from lightly.utils.scheduler import cosine_schedule
 from lightly.models.modules.masked_autoencoder import MAEBackbone, MAEDecoder
 from lightly.models.modules.heads import MSNProjectionHead, DINOProjectionHead
 
 
-
+# vanilla MSN
 class MSN(pl.LightningModule):
-    def __init__(self):
-        super().__init__()
-        hd = 768
-        # ViT small configuration (ViT-S/16)
-        self.mask_ratio = 0.15
-        self.backbone = MAEBackbone(
-            image_size=224,
-            patch_size=16,
-            num_layers=12,
-            num_heads=6,
-            hidden_dim=hd,
-            mlp_dim=hd * 4,
-        )
+    def __init__(self,
+                 image_size: int = 224,
+                 patch_size: int = 16,
+                 num_layers: int = 12,
+                 num_heads: int = 6,
+                 hiddin_dim: int = 192,
+                 mask_ratio: float = 0.15,
+                 num_prototypes: int = 1024,
+                 lr: float = 0.00001,
+                 wd=0.0001,
+                 max_epochs: int = 100):
         
-        self.projection_head = MSNProjectionHead(hd,hd*4,hd)
+        super().__init__()
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+        self.hidden_dim = hiddin_dim
+        self.mask_ratio = mask_ratio
+        self.num_prototypes = num_prototypes
+        self.lr = lr
+        self.wd = wd
+        self.max_epochs = max_epochs
+
+        # ViT small configuration (ViT-S/16)
+        self.backbone = MAEBackbone(
+            image_size=self.image_size,
+            patch_size=self.patch_size,
+            num_layers=self.num_layers,
+            num_heads=self.num_heads,
+            hidden_dim=self.hidden_dim,
+            mlp_dim=self.hidden_dim * 4)
+        
+        
+        self.projection_head = MSNProjectionHead(self.hidden_dim,self.hidden_dim*4,self.hidden_dim)
 
         self.anchor_backbone = copy.deepcopy(self.backbone)
         self.anchor_projection_head = copy.deepcopy(self.projection_head)
@@ -33,8 +55,9 @@ class MSN(pl.LightningModule):
         utils.deactivate_requires_grad(self.backbone)
         utils.deactivate_requires_grad(self.projection_head)
 
-        self.prototypes = nn.Linear(hd, 1024, bias=False).weight
+        self.prototypes = nn.Linear(self.hidden_dim, self.num_prototypes, bias=False).weight
         self.criterion = MSNLoss()
+
 
     def training_step(self, batch, batch_idx):
         utils.update_momentum(self.anchor_backbone, self.backbone, 0.996)
@@ -73,44 +96,58 @@ class MSN(pl.LightningModule):
             *list(self.anchor_projection_head.parameters()),
             self.prototypes,
         ]
-        optim = torch.optim.AdamW(params, lr=0.0001,weight_decay=0.001)
-        return optim
+        optimizer = torch.optim.AdamW(params, lr=self.lr,weight_decay=self.wd)
+
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=optimizer,
+                                                         eta_min=0,
+                                                         T_max=self.max_epochs
+                                                         )
+        
+        return {'optimizer': optimizer,
+                'lr_scheduler': scheduler
+               }
     
 
-
+# DINO model
 class DINO(pl.LightningModule):
     def __init__(self,
-                 learning_rate: float= 0.0001,
-                 weight_decay:float= 0.001,
-                 max_epochs: int = 100,
-                 
-                )-> None:
+                 image_size: int = 224,
+                 patch_size: int = 16,
+                 num_layers: int = 12,
+                 num_heads: int = 6,
+                 hiddin_dim: int = 192,
+                 num_prototypes: int = 1024,
+                 lr: float = 0.00001,
+                 wd=0.0001,
+                 max_epochs: int = 100):
+        
         super().__init__()
-#         resnet = torchvision.models.resnet18()
-#         backbone = nn.Sequential(*list(resnet.children())[:-1])
-#         input_dim = 512
-        # instead of a resnet you can also use a vision transformer backbone as in the
-        # original paper (you might have to reduce the batch size in this case):
-        self.learning_rate = learning_rate
-        self.weight_decay = weight_decay
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+        self.hidden_dim = hiddin_dim
+        self.num_prototypes = num_prototypes
+        self.lr = lr
+        self.wd = wd
         self.max_epochs = max_epochs
         
         self.backbone = MAEBackbone(
-            image_size=224,
-            patch_size=16,
-            num_layers=12,
-            num_heads=6,
-            hidden_dim=384,
-            mlp_dim=384 * 4,
+            image_size=self.image_size,
+            patch_size=self.patch_size,
+            num_layers=self.num_layers,
+            num_heads=self.num_heads,
+            hidden_dim=self.hidden_dim,
+            mlp_dim=self.hidden_dim * 4,
         )
-        input_dim = self.backbone.hidden_dim
+
 
         self.student_backbone = self.backbone
         self.student_head = DINOProjectionHead(
-            input_dim, 512, 256, 1024, freeze_last_layer=1)
+            self.hidden_dim, 512, 256, 1024, freeze_last_layer=1)
         
         self.teacher_backbone = copy.deepcopy(self.backbone)
-        self.teacher_head = DINOProjectionHead(input_dim, 512, 256, 1024)
+        self.teacher_head = DINOProjectionHead(self.hidden_dim, 512, 256, 1024)
         utils.deactivate_requires_grad(self.teacher_backbone)
         utils.deactivate_requires_grad(self.teacher_head)
 
@@ -160,31 +197,42 @@ class DINO(pl.LightningModule):
                }
 
 
+
+# Masked AutoEncoder Model
 class MAE(pl.LightningModule):
     def __init__(self,
-                 learning_rate: float= 0.00001,
-                 weight_decay: float= 0.0001,
-                 max_epochs: int = 100,
-                 ):
-        super().__init__()
-
-        decoder_dim = 512
-        # vit = torchvision.models.vit_b_32(pretrained=False)
-        self.mask_ratio = 0.6
-        self.learning_rate = learning_rate
-        self.weight_decay = weight_decay
-        self.max_epochs = max_epochs        
+                 image_size: int = 224,
+                 patch_size: int = 16,
+                 num_layers: int = 12,
+                 num_heads: int = 6,
+                 hiddin_dim: int = 192,
+                 mask_ratio: float = 0.6,
+                 decoder_dim: int=512,
+                 lr: float = 0.00001,
+                 wd=0.0001,
+                 max_epochs: int = 100):
         
-        self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_dim))
+        super().__init__()
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+        self.hidden_dim = hiddin_dim
+        self.mask_ratio = mask_ratio
+        self.decoder_dim = decoder_dim
+        self.lr = lr
+        self.wd = wd
+        self.max_epochs = max_epochs
+  
+        
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, self.decoder_dim))
         self.backbone = MAEBackbone(
-            image_size=224,
-            patch_size=16,
-            num_layers=12,
-            num_heads=6,
-            hidden_dim=384,
-            mlp_dim=384*4,
-        )
-        self.patch_size = self.backbone.patch_size
+            image_size=self.image_size,
+            patch_size=self.patch_size,
+            num_layers=self.num_layers,
+            num_heads=self.num_heads,
+            hidden_dim=self.hidden_dim,
+            mlp_dim=self.hidden_dim*4)
         
         self.decoder = MAEDecoder(
             seq_length=self.backbone.seq_length,

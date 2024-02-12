@@ -1,17 +1,16 @@
 import os
 import torch
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch.nn as nn
 import torch.optim as optim
 import pytorch_lightning as pl
 
 
-
+from typing import List
 from torch import Tensor
 from lightly.models import utils
-from typing import List
 from src.models.utils import get_model_performance
 from sklearn.metrics import roc_auc_score, average_precision_score
 class EvaluationModel(pl.LightningModule):
