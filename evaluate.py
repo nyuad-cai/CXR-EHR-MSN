@@ -29,6 +29,7 @@ parser.add_argument('--log-dir', type=str, default='./logs')
 parser.add_argument('--scheduler', type=str, default='cosine')
 parser.add_argument('--data-percent', type=float, default=1.0)
 parser.add_argument('--learning-rate', type=float, default=0.0001)
+parser.add_argument('--max-epochs', type=int, default=100)
 
 args = parser.parse_args()
 
@@ -40,10 +41,12 @@ if args.dataset == 'mimic':
                          split='train', 
                          transform=train_transforms,
                          percentage=float(args.data_percent))
+    
     val_dataset = MIMICCXR(paths=paths,
                            data_dir=mimic_data_dir, 
                            split='validate', 
                            transform=val_test_transforms)
+    
     test_dataset = MIMICCXR(paths=paths,
                             data_dir=mimic_data_dir, 
                             split='test', 
@@ -141,10 +144,9 @@ logger = CSVLogger(save_dir= args.log_dir)
 
 model = EvaluationModel(backbone=backbone,
                         learning_rate=args.learning_rate,
-                        weight_decay=0.0,
                         output_dim=14,
                         freeze=args.freeze,
-                        max_epochs=50,
+                        max_epochs=args.max_epochs,
                         scheduler=args.scheduler,
                         summary_path=os.path.join(args.log_dir,'lightning_logs',logger.version))
 
@@ -152,7 +154,7 @@ model.backbone.heads.head= nn.Linear(in_features=model.backbone.heads.head.in_fe
                                       out_features=model.output_dim)
 
 
-trainer = pl.Trainer(max_epochs=50,
+trainer = pl.Trainer(max_epochs=args.max_epochs,
                      num_sanity_val_steps=0,
                      callbacks=[checkpoint_callback,early_stop],
                      logger=logger,

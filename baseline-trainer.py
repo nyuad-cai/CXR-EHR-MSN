@@ -23,7 +23,7 @@ parser.add_argument('--data-dir',type=str, default=os.path.join('.','data') )
 parser.add_argument('--log-dir',type=str, default=os.path.join('.','logs'))
 parser.add_argument('--learning-rate', type=float, default=0.0001)
 parser.add_argument('--weight-decay', type=float, default=0.001)
-parser.add_argument('--max-epochs', type=int, default=100)
+parser.add_argument('--max-epochs', type=int, default=50)
 
 args = parser.parse_args()
 
@@ -58,7 +58,7 @@ if args.model == 'msn':
                 num_prototypes=1024,
                 lr=args.learning_rate,
                 wd=args.weight_decay,
-                max_epochs=100)
+                max_epochs=args.max_epochs)
 
 elif args.model == 'dino':
     model = DINO(image_size=224,
@@ -70,7 +70,7 @@ elif args.model == 'dino':
                  num_prototypes=1024,
                  lr=0.00001,
                  wd=0.0001,
-                 max_epochs=100)
+                 max_epochs=args.max_epochs)
 
 elif args.models == 'mae':
     model = MAE(image_size=224,
@@ -82,7 +82,7 @@ elif args.models == 'mae':
                 decoder_dim=512,
                 lr=0.00001,
                 wd=0.0001,
-                max_epochs=100)
+                max_epochs=args.max_epochs)
 
 
 trainer = pl.Trainer(max_epochs=args.max_epochs,

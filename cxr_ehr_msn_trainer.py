@@ -24,8 +24,6 @@ parser.add_argument('--ehr-in',type=int, default=2)
 parser.add_argument('--ehr-out',type=int, default=128)
 parser.add_argument('--data-dir',type=str, default=os.path.join('./','data','meta.csv'))
 parser.add_argument('--log-dir',type=str, default=os.path.join('.','logs'))
-
-
 parser.add_argument('--num-prototypes', type=int, default=1024)
 parser.add_argument('--learning-rate', type=float, default=0.0001)
 parser.add_argument('--weight-decay', type=float, default=0.001)
