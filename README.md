@@ -50,29 +50,29 @@ We use [MIMIC-IV EHR](https://physionet.org/content/mimiciv/1.0/) and [MIMIC 
 
 ```bash
 python cxr_ehr_msn_trainer.py --dim 192 \ # ViT hidden dim 192 vs 384
-															--ehr-in 2 \ # ehr input vector dimensionality
-															--ehr-out 128 \ # ehr embedding dimensionality
-															--data-dir path/to/mimic-cxr # cxr.jpeg data dir
-															--log-dir path/to/logs-dir # ehr.csv data file
-															--num-prototypes 1024 \ # number of trainable prototypes
-															--learning-rate 0.0001 \ # learning rate value
-															--weight-decay 0.001 \ # weight decay value
-															--max-epochs 100 # number of tarining epochs
+			      --ehr-in 2 \ # ehr input vector dimensionality
+			      --ehr-out 128 \ # ehr embedding dimensionality
+			      --data-dir path/to/mimic-cxr # cxr.jpeg data dir
+			      --log-dir path/to/logs-dir # ehr.csv data file
+			      --num-prototypes 1024 \ # number of trainable prototypes
+			      --learning-rate 0.0001 \ # learning rate value
+			      --weight-decay 0.001 \ # weight decay value
+			      --max-epochs 100 # number of tarining epochs
 ```
 
 ## Evaluation
 
 ```bash
 python cxr_ehr_msn_trainer.py --dim 192 \ #ViT hidden dim 192 or 384 
-															--freeze 1 \ # backbone freezing for linear evaluation 1 vs 0
-															--dataset mimic \ # evaluation dataset mimic, chexpert, nih
-															--data-dir path/to/mimic-cxr # cxr.jpeg data dir
-															--log-dir path/to/logs-dir # loging directory path
-															--scheduler \ # lr scheduler cosine, reduce
-															--learning-rate 0.0001 \ # learning rate value
-															--data-percen  1.0 \ # fraction of data for low data regimes 
-															--max-epochs 100 \ # number of tarining epochs
-															--ckpt-path /path/to/pretrained/model/*.ckpt # checkpoint path
+			      --freeze 1 \ # backbone freezing for linear evaluation 1 vs 0
+	     		      --dataset mimic \ # evaluation dataset mimic, chexpert, nih
+			      --data-dir path/to/mimic-cxr # cxr.jpeg data dir
+			      --log-dir path/to/logs-dir # loging directory path
+			      --scheduler \ # lr scheduler cosine, reduce
+			      --learning-rate 0.0001 \ # learning rate value
+			      --data-percen  1.0 \ # fraction of data for low data regimes 
+             		      --max-epochs 100 \ # number of tarining epochs
+			      --ckpt-path /path/to/pretrained/model/*.ckpt # checkpoint path
 ```
 
 # Citation
