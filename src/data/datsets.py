@@ -42,11 +42,6 @@ class CxrEhrDataset(Dataset):
         return img, ehr
 
 
-
-
-        
-
-
 class BaselinesDataset(Dataset):
     def __init__(self, 
                  data_dir: str, 

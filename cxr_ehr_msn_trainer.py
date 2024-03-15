@@ -19,14 +19,14 @@ torch.set_float32_matmul_precision('high')
 parser = argparse.ArgumentParser(description='SSL training command line interface')
 
 
-parser.add_argument('--dim',type=int, default=192)
-parser.add_argument('--ehr-in',type=int, default=2)
+parser.add_argument('--dim',type=int, default=384)
+parser.add_argument('--ehr-in',type=int, default=10)
 parser.add_argument('--ehr-out',type=int, default=128)
 parser.add_argument('--data-dir',type=str, default=os.path.join('./','data','meta.csv'))
 parser.add_argument('--log-dir',type=str, default=os.path.join('.','logs'))
 parser.add_argument('--num-prototypes', type=int, default=1024)
-parser.add_argument('--learning-rate', type=float, default=0.0001)
-parser.add_argument('--weight-decay', type=float, default=0.001)
+parser.add_argument('--learning-rate', type=float, default=0.000001)
+parser.add_argument('--weight-decay', type=float, default=0.00001)
 parser.add_argument('--max-epochs', type=int, default=100)
 
 args = parser.parse_args()
@@ -61,9 +61,9 @@ model = CxrEhrMSN(image_size=224,
                   hiddin_dim=args.dim,
                   ehr_in=args.ehr_in,
                   ehr_out=args.ehr_out,
-                  num_prototypes=args.num_,
+                  num_prototypes=args.num_prototypes,
                   lr=args.learning_rate,
-                  wd=args.wd,
+                  wd=args.weight_decay,
                   mask_ratio=0.15,
                   max_epochs= args.max_epochs
                   )
@@ -90,7 +90,7 @@ trainer = pl.Trainer(accelerator='auto',
                      log_every_n_steps=1,
                      max_epochs=args.max_epochs,
                      precision='16-mixed', 
-                     callbacks=[checkpoint_callback,early_stop],
+                     callbacks=[checkpoint_callback],#,early_stop],
                      default_root_dir=args.log_dir
                      )
 

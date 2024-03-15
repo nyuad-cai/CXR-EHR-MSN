@@ -5,3 +5,8 @@ __pycache__/
 /models/
 lightning_logs/
 baselines/
+embeddings*
+logs*
+ehr-fine-tune.ipynb
+T-SNE-Final.ipynb
+tsne.ipynb

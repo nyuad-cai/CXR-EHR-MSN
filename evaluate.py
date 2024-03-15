@@ -25,16 +25,16 @@ parser = argparse.ArgumentParser(description='SSL evaluation command line interf
 parser.add_argument('--dim', type=int, default=192)
 parser.add_argument('--freeze', type=int, default=1)
 parser.add_argument('--dataset', type=str, default='mimic')
-parser.add_argument('--log-dir', type=str, default='./logs')
+parser.add_argument('--log-dir', type=str, default='./logs1')
 parser.add_argument('--scheduler', type=str, default='cosine')
 parser.add_argument('--data-percent', type=float, default=1.0)
 parser.add_argument('--learning-rate', type=float, default=0.0001)
-parser.add_argument('--max-epochs', type=int, default=100)
+parser.add_argument('--max-epochs', type=int, default=50)
 
 args = parser.parse_args()
 
 if args.dataset == 'mimic':
-    mimic_data_dir = ''
+    mimic_data_dir = os.getenv('DATA_DIR')
     paths = glob.glob(os.path.join(mimic_data_dir,'resized','**','*.jpg'), recursive=True)
     train_dataset = MIMICCXR(paths=paths,
                          data_dir= mimic_data_dir, 
@@ -120,7 +120,7 @@ backbone = VisionTransformer(image_size=224,
 
 
 
-ckpt_path = ''
+ckpt_path = os.getenv('CKPT_PATH')
 all_weights = torch.load(ckpt_path,map_location='cpu')['state_dict']
 weight = parse_weights(all_weights)
 
@@ -139,16 +139,16 @@ checkpoint_callback = ModelCheckpoint(monitor='val_auroc',
                                       save_top_k=1,
                                      )
 
-logger = CSVLogger(save_dir= args.log_dir)
+logger = CSVLogger(save_dir= os.path.join(args.log_dir,os.getenv('VARS')),version=os.getenv('SLURM_JOB_ID'))
 
-
+print(args.learning_rate)
 model = EvaluationModel(backbone=backbone,
                         learning_rate=args.learning_rate,
                         output_dim=14,
                         freeze=args.freeze,
                         max_epochs=args.max_epochs,
                         scheduler=args.scheduler,
-                        summary_path=os.path.join(args.log_dir,'lightning_logs',logger.version))
+                        summary_path=os.path.join(args.log_dir,os.getenv('VARS'),'lightning_logs',str(logger.version)))
 
 model.backbone.heads.head= nn.Linear(in_features=model.backbone.heads.head.in_features,
                                       out_features=model.output_dim)

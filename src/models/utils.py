@@ -64,7 +64,7 @@ def computing_confidence_intervals(list_,true_value):
 
 def get_model_performance(df,summary_path):
     test_auprc, test_auroc = evaluate_new(df)
-    auprc_list, auroc_list = bootstraping_eval(df, num_iter=100)
+    auprc_list, auroc_list = bootstraping_eval(df, num_iter=1000)
     upper_auprc, lower_auprc = computing_confidence_intervals(auprc_list, test_auprc)
     upper_auroc, lower_auroc = computing_confidence_intervals(auroc_list, test_auroc)
     print("\n--------------")
