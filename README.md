@@ -14,7 +14,7 @@
 
 # Project overview:
 
-!https://github.com/nyuad-cai/CXR-EHR-MSN/raw/main/Assets/msn.png
+![image info](./Assets/msn.png)
 
 ## Abstract:
 
