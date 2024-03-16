@@ -1,3 +1,3 @@
 # t-SNE Results
 
-![](./tsne-reslults.png)
+![](./tsne-results.png)
