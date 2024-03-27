@@ -1,7 +1,3 @@
-# chexmsn readme
-
-# Project title:
-
 **Enhancing Chest X-Ray Representation Learning with Masked Siamese Networks and Electronic Health Records:**
 
 # Collaborators:
@@ -9,7 +5,7 @@
 | Name | Role | Institution |
 | --- | --- | --- |
 | Saeed Shurrab | Rsearch assistant | New York University Abu Dhabi |
-| alejandro guerra-manzanares | PostDoc researcher | New York University Abu Dhabi |
+| Alejandro Guerra-Manzanares | PostDoc researcher | New York University Abu Dhabi |
 | Farah Shamout | Principal investigator | New York University Abu Dhabi |
 
 # Project overview:
@@ -18,7 +14,7 @@
 
 ## Abstract:
 
-Self-supervised learning methods for medical imaging primarily rely on image data for pretraining. While this approach delivers promising results, incorporating associated information from Electronic Health Records (EHR) can enhance the quality of the learned representation. In this paper, we investigate the impact of incorporating three groups of EHR data including socio-demographic, scan metadata, and inpatient stay information during the pretraining on downstream task performance. We experiment with all possible combinations of these three groups as well as their single variables, using the Masked Siamese Network (MSN) self-supervised learning architecture. We evaluate our proposal on three publicly available chest X-ray datasets (MIMIC-CXR, CheXpert, and NIH14) using two vision transformer (ViT) backbones, ViT-Tiny and ViT-Small, under linear evaluation and low-data regime fine-tuning. Our approach shows significant improvement as compared to vanilla MSN and superior performance as compared state-of-the-art self-supervised learning baselines. Our work highlights the potential of EHR-enhanced pretraining and opens opportunities for future research to address limitations in existing representation learning methods for other medical imaging modalities, such as neuro-, ophthalmic, and sonar imaging
+Self-supervised learning methods for medical imaging primarily rely on image data for pretraining. While such approaches deliver promising results, we hypothesize that incorporating associated information from Electronic Health Records (EHR) can enhance the quality of the learned representations. In this paper, we investigate the impact of incorporating three types of EHR data during pretraining using Masked Siamese Networks (MSN) on downstream classification, including socio-demographic, scan metadata, and inpatient stay information. We evaluate our proposal on three publicly available chest X-ray datasets (MIMIC-CXR, CheXpert, and NIH14) using two vision transformer (ViT) backbones, ViT-Tiny and ViT-Small, in linear evaluation and low-data regime fine-tuning. In linear evaluation, our proposed method demonstrates significant improvement compared to \emph{vanilla} MSN and state-of-the-art self-supervised learning baselines and achieves a comparable performance in fine-tuning. Our work highlights the potential of EHR-enhanced pretraining and opens opportunities for future research to address limitations in existing representation learning methods for medical imaging modalities.
 
 # Setup
 
@@ -63,16 +59,14 @@ python cxr_ehr_msn_trainer.py --dim 192 \ # ViT hidden dim 192 vs 384
 ## Evaluation
 
 ```bash
-python cxr_ehr_msn_trainer.py --dim 192 \ #ViT hidden dim 192 or 384 
+python evaluate.py --dim 192 \ #ViT hidden dim 192 or 384 
 			      --freeze 1 \ # backbone freezing for linear evaluation 1 vs 0
-	     		      --dataset mimic \ # evaluation dataset mimic, chexpert, nih
-			      --data-dir path/to/mimic-cxr # cxr.jpeg data dir
+	     		  --dataset mimic \ # evaluation dataset mimic, chexpert, nih
 			      --log-dir path/to/logs-dir # loging directory path
 			      --scheduler \ # lr scheduler cosine, reduce
 			      --learning-rate 0.0001 \ # learning rate value
 			      --data-percen  1.0 \ # fraction of data for low data regimes 
-             		      --max-epochs 100 \ # number of tarining epochs
-			      --ckpt-path /path/to/pretrained/model/*.ckpt # checkpoint path
+             	  --max-epochs 100 \ # number of tarining epochs
 ```
 
 # Citation
