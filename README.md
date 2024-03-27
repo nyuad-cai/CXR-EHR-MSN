@@ -60,13 +60,13 @@ python cxr_ehr_msn_trainer.py --dim 192 \ # ViT hidden dim 192 vs 384
 
 ```bash
 python evaluate.py --dim 192 \ #ViT hidden dim 192 or 384 
-			      --freeze 1 \ # backbone freezing for linear evaluation 1 vs 0
-	     		  --dataset mimic \ # evaluation dataset mimic, chexpert, nih
-			      --log-dir path/to/logs-dir # loging directory path
-			      --scheduler \ # lr scheduler cosine, reduce
-			      --learning-rate 0.0001 \ # learning rate value
-			      --data-percen  1.0 \ # fraction of data for low data regimes 
-             	  --max-epochs 100 \ # number of tarining epochs
+			       --freeze 1 \ # backbone freezing for linear evaluation 1 vs 0
+	     		   --dataset mimic \ # evaluation dataset mimic, chexpert, nih
+			       --log-dir path/to/logs-dir # loging directory path
+			       --scheduler \ # lr scheduler cosine, reduce
+			       --learning-rate 0.0001 \ # learning rate value
+			       --data-percen  1.0 \ # fraction of data for low data regimes 
+             	   --max-epochs 100 \ # number of tarining epochs
 ```
 
 # Citation
