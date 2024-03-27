@@ -1,4 +1,4 @@
-**Enhancing Chest X-Ray Representation Learning with Masked Siamese Networks and Electronic Health Records:**
+# Enhancing Chest X-Ray Representation Learning with Masked Siamese Networks and Electronic Health Records
 
 # Collaborators:
 
