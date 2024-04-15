@@ -1,12 +1,4 @@
-# Enhancing Chest X-Ray Representation Learning with Masked Siamese Networks and Electronic Health Records
-
-# Collaborators:
-
-| Name | Role | Institution |
-| --- | --- | --- |
-| Saeed Shurrab | Rsearch assistant | New York University Abu Dhabi |
-| Alejandro Guerra-Manzanares | PostDoc researcher | New York University Abu Dhabi |
-| Farah Shamout | Principal investigator | New York University Abu Dhabi |
+# Multi-modal Masked Siamese Network Improves Chest X-ray Representation Learning
 
 # Project overview:
 
