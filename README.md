@@ -64,3 +64,16 @@ python evaluate.py --dim 192 \ # ViT hidden dim 192 or 384
 # Citation
 
 Please consider citing our work when using this repo:
+
+```bib
+@article{shurrab2024multimodal,
+  title={Multimodal masked siamese network improves chest X-ray representation learning},
+  author={Shurrab, Saeed and Guerra-Manzanares, Alejandro and E. Shamout, Farah},
+  journal={Scientific Reports},
+  volume={14},
+  number={1},
+  pages={22516},
+  year={2024},
+  publisher={Nature Publishing Group UK London}
+}
+```
